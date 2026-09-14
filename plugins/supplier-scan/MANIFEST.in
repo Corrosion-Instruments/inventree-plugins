@@ -1,0 +1,2 @@
+recursive-include inventree_supplier_scan/static *
+recursive-include inventree_supplier_scan/templates *

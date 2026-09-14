@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{{ title }}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #15202b;
+      --muted: #5e6a75;
+      --line: #d8dee6;
+      --surface: #ffffff;
+      --band: #f5f7fa;
+      --action: #0b6bcb;
+      --danger: #b42318;
+      --ok: #067647;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--band);
+    }
+
+    header,
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 24px 0 12px;
+    }
+
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .top-nav a {
+      color: var(--action);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 550;
+    }
+
+    .top-nav a:hover {
+      text-decoration: underline;
+    }
+
+    .top-nav nav {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .top-nav .brand {
+      color: var(--ink);
+      font-size: 16px;
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    main {
+      display: grid;
+      gap: 16px;
+      padding-bottom: 32px;
+    }
+
+    section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .scan-row,
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .controls {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 14px;
+    }
+
+    .part-picker {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, .45fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin-top: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input,
+    select,
+    button {
+      min-height: 40px;
+      border-radius: 6px;
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #fff;
+      padding: 8px 10px;
+    }
+
+    button {
+      border: 1px solid var(--action);
+      background: var(--action);
+      color: #fff;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--action);
+    }
+
+    button.danger {
+      border-color: var(--danger);
+      background: var(--danger);
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .image-panel {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .image-panel img {
+      width: 140px;
+      height: 100px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .image-panel strong {
+      display: block;
+      font-size: 15px;
+      overflow-wrap: anywhere;
+    }
+
+    .image-panel span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .image-option {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--ink);
+    }
+
+    .image-option input {
+      width: auto;
+      min-height: auto;
+    }
+
+    .metric {
+      border-left: 3px solid var(--line);
+      padding: 6px 10px;
+      min-width: 0;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
+
+    .message {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: #eef4ff;
+      color: #1849a9;
+      display: none;
+    }
+
+    .message.error {
+      background: #fff1f0;
+      color: var(--danger);
+    }
+
+    .message.ok {
+      background: #ecfdf3;
+      color: var(--ok);
+    }
+
+    .message a {
+      color: inherit;
+      font-weight: 650;
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      width: 180px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .inline {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .inline label {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      color: var(--ink);
+    }
+
+    .inline input[type="checkbox"] {
+      width: auto;
+      min-height: auto;
+    }
+
+    @media (max-width: 800px) {
+      header,
+      main {
+        width: min(100% - 20px, 1180px);
+      }
+
+      .scan-row,
+      .part-picker,
+      .controls,
+      .summary,
+      .image-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .top-nav {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .top-nav nav {
+        justify-content: flex-start;
+      }
+
+      .image-panel img {
+        width: 100%;
+        height: 160px;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top-nav">
+      <a class="brand" href="/web/">InvenTree</a>
+      <nav aria-label="Primary">
+        <a href="/web/">Dashboard</a>
+        <a href="/web/part/">Parts</a>
+        <a href="/web/stock/">Stock</a>
+        <a href="/web/purchasing/">Purchasing</a>
+        <a href="/web/settings/user/">Settings</a>
+      </nav>
+    </div>
+    <h1>Supplier Scan</h1>
+  </header>
+
+  <main>
+    <section>
+      <form id="scan-form">
+        <div class="scan-row">
+          <label>
+            Barcode
+            <input id="barcode" name="barcode" autocomplete="off" autofocus>
+          </label>
+          <button type="submit">Preview</button>
+        </div>
+      </form>
+      <div id="message" class="message"></div>
+    </section>
+
+    <section id="preview-section" class="hidden">
+      <div id="image-panel" class="image-panel hidden">
+        <img id="supplier-image" alt="">
+        <div>
+          <strong id="image-title"></strong>
+          <span id="image-meta"></span>
+          <label class="image-option">
+            <input id="use-image" type="checkbox" checked>
+            Use supplier photo
+          </label>
+        </div>
+      </div>
+
+      <div class="summary">
+        <div class="metric">Supplier<strong id="supplier"></strong></div>
+        <div class="metric">SKU<strong id="sku"></strong></div>
+        <div class="metric">MPN<strong id="mpn"></strong></div>
+        <div class="metric">Quantity<strong id="quantity-display"></strong></div>
+      </div>
+
+      <table>
+        <tbody>
+          <tr>
+            <th>Part</th>
+            <td id="part-status"></td>
+          </tr>
+          <tr>
+            <th>Supplier Part</th>
+            <td id="supplier-part-status"></td>
+          </tr>
+          <tr>
+            <th>Source</th>
+            <td id="source-status"></td>
+          </tr>
+          <tr>
+            <th>Category</th>
+            <td id="category-status"></td>
+          </tr>
+          <tr>
+            <th>Duplicate</th>
+            <td id="duplicate-status"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table id="parameter-table" class="hidden">
+        <tbody id="parameter-rows"></tbody>
+      </table>
+
+      <div class="part-picker">
+        <label>
+          Existing Part
+          <select id="existing-part"></select>
+        </label>
+        <label>
+          Search Parts
+          <input id="part-search" autocomplete="off">
+        </label>
+        <button id="part-search-button" class="secondary" type="button">Search</button>
+      </div>
+
+      <div class="controls">
+        <label>
+          Category
+          <select id="category"></select>
+        </label>
+        <label>
+          Location
+          <select id="location"></select>
+        </label>
+        <label>
+          Quantity
+          <input id="quantity" type="number" min="0.00001" step="0.00001">
+        </label>
+      </div>
+
+      <div class="inline">
+        <button id="receive" type="button">Receive</button>
+        <button id="clear" class="secondary" type="button">Clear</button>
+        <label>
+          <input id="allow-duplicate" type="checkbox">
+          Allow duplicate
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      preview: null,
+      categories: [],
+      locations: []
+    };
+
+    const els = {
+      form: document.getElementById('scan-form'),
+      barcode: document.getElementById('barcode'),
+      message: document.getElementById('message'),
+      previewSection: document.getElementById('preview-section'),
+      supplier: document.getElementById('supplier'),
+      sku: document.getElementById('sku'),
+      mpn: document.getElementById('mpn'),
+      quantityDisplay: document.getElementById('quantity-display'),
+      partStatus: document.getElementById('part-status'),
+      supplierPartStatus: document.getElementById('supplier-part-status'),
+      sourceStatus: document.getElementById('source-status'),
+      categoryStatus: document.getElementById('category-status'),
+      duplicateStatus: document.getElementById('duplicate-status'),
+      category: document.getElementById('category'),
+      existingPart: document.getElementById('existing-part'),
+      partSearch: document.getElementById('part-search'),
+      partSearchButton: document.getElementById('part-search-button'),
+      location: document.getElementById('location'),
+      quantity: document.getElementById('quantity'),
+      receive: document.getElementById('receive'),
+      clear: document.getElementById('clear'),
+      allowDuplicate: document.getElementById('allow-duplicate'),
+      useImage: document.getElementById('use-image'),
+      imagePanel: document.getElementById('image-panel'),
+      supplierImage: document.getElementById('supplier-image'),
+      imageTitle: document.getElementById('image-title'),
+      imageMeta: document.getElementById('image-meta'),
+      parameterTable: document.getElementById('parameter-table'),
+      parameterRows: document.getElementById('parameter-rows')
+    };
+
+    function csrfToken() {
+      return document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('csrftoken='))
+        ?.split('=')[1] || document.querySelector('meta[name="csrf-token"]')?.content || '';
+    }
+
+    async function postJson(url, payload) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken()
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+      if (!response.ok) {
+        const error = new Error(body.error || 'Request failed');
+        error.body = body;
+        error.status = response.status;
+        throw error;
+      }
+      return body;
+    }
+
+    async function getJson(url) {
+      const response = await fetch(url);
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || 'Request failed');
+      }
+      return body;
+    }
+
+    function setMessage(text, kind = '') {
+      els.message.textContent = text || '';
+      els.message.className = `message ${kind}`.trim();
+      els.message.style.display = text ? 'block' : 'none';
+    }
+
+    function setReceiveMessage(result) {
+      els.message.textContent = '';
+      els.message.className = 'message ok';
+
+      const imageText = result.metadata_sync?.image_attached ? ' Photo attached.' : '';
+      els.message.appendChild(
+        document.createTextNode(`Received ${result.quantity} into stock item ${result.stock_item.pk}.${imageText}`)
+      );
+
+      appendMessageLink('View part', result.part?.web_url);
+      appendMessageLink('View stock item', result.stock_item?.web_url);
+      els.message.style.display = 'block';
+    }
+
+    function appendMessageLink(label, url) {
+      if (!url) {
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = url;
+      link.textContent = label;
+      els.message.appendChild(link);
+    }
+
+    function fillSelect(select, rows, selectedPk, includeBlank = true) {
+      select.innerHTML = '';
+      if (includeBlank) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '';
+        select.appendChild(option);
+      }
+
+      for (const row of rows) {
+        const option = document.createElement('option');
+        option.value = row.pk;
+        option.textContent = row.path || row.name || row.label;
+        if (String(row.pk) === String(selectedPk || '')) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      }
+    }
+
+    function partOptionText(row) {
+      const details = [row.ipn, row.category, row.reason].filter(Boolean).join(' | ');
+      return `${row.label || row.name}${details ? ' - ' + details : ''}`;
+    }
+
+    function mergeParts(rows) {
+      const seen = new Set();
+      return rows.filter((row) => {
+        if (!row?.pk || seen.has(String(row.pk))) {
+          return false;
+        }
+        seen.add(String(row.pk));
+        return true;
+      });
+    }
+
+    function fillPartSelect(rows, selectedPk) {
+      els.existingPart.innerHTML = '';
+
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = 'Create new part';
+      els.existingPart.appendChild(blank);
+
+      for (const row of rows) {
+        const option = document.createElement('option');
+        option.value = row.pk;
+        option.textContent = partOptionText(row);
+        if (String(row.pk) === String(selectedPk || '')) {
+          option.selected = true;
+        }
+        els.existingPart.appendChild(option);
+      }
+    }
+
+    function syncCategoryState() {
+      const hasExistingPart = Boolean(state.preview?.part || els.existingPart.value);
+      els.category.disabled = hasExistingPart;
+    }
+
+    function supplierImageUrl(url, supplier) {
+      if (!url) {
+        return '';
+      }
+      if (url.startsWith('//')) {
+        return `https:${url}`;
+      }
+      if (url.startsWith('/')) {
+        return supplier === 'digikey' ? `https://www.digikey.com${url}` : `https://www.lcsc.com${url}`;
+      }
+      return url;
+    }
+
+    function renderImage(source) {
+      const imageUrl = supplierImageUrl(source.image_url || '', source.supplier || '');
+      if (!imageUrl) {
+        els.imagePanel.classList.add('hidden');
+        els.supplierImage.removeAttribute('src');
+        els.useImage.checked = false;
+        els.useImage.disabled = true;
+        return;
+      }
+
+      els.supplierImage.src = imageUrl;
+      els.supplierImage.alt = source.name || source.mpn || source.sku || 'Supplier part image';
+      els.imageTitle.textContent = source.name || source.mpn || source.sku || '';
+      els.imageMeta.textContent = source.manufacturer || source.description || '';
+      els.useImage.checked = true;
+      els.useImage.disabled = false;
+      els.imagePanel.classList.remove('hidden');
+    }
+
+    function renderParameters(parameters) {
+      const rows = Object.entries(parameters || {})
+        .filter(([key, value]) => key && value)
+        .sort(([left], [right]) => left.localeCompare(right));
+
+      els.parameterRows.innerHTML = '';
+      els.parameterTable.classList.toggle('hidden', rows.length === 0);
+
+      for (const [key, value] of rows) {
+        const row = document.createElement('tr');
+        const header = document.createElement('th');
+        const cell = document.createElement('td');
+        header.textContent = key;
+        cell.textContent = value;
+        row.appendChild(header);
+        row.appendChild(cell);
+        els.parameterRows.appendChild(row);
+      }
+    }
+
+    function renderPreview(preview) {
+      const parsed = preview.parsed;
+      const source = preview.source;
+      const categoryPk = preview.category_suggestion?.pk;
+      const locationPk = preview.default_location?.pk;
+      const partRows = mergeParts([
+        ...(preview.part ? [preview.part] : []),
+        ...(preview.part_candidates || [])
+      ]);
+
+      state.preview = preview;
+      els.previewSection.classList.remove('hidden');
+      els.supplier.textContent = parsed.supplier_name || '';
+      els.sku.textContent = parsed.sku || '';
+      els.mpn.textContent = source.mpn || parsed.mpn || '';
+      els.quantityDisplay.textContent = parsed.quantity || '1';
+      els.quantity.value = parsed.quantity || '1';
+
+      els.partStatus.textContent = preview.part?.label || 'New part';
+      els.supplierPartStatus.textContent = preview.supplier_part?.label || 'New supplier part';
+      els.sourceStatus.textContent = `${source.lookup_status}${source.lookup_error ? ': ' + source.lookup_error : ''}`;
+      els.categoryStatus.textContent = preview.category_suggestion?.path || 'Select category';
+      els.duplicateStatus.textContent = preview.duplicate_stock_item?.label || 'No';
+
+      fillSelect(
+        els.category,
+        state.categories.filter((row) => !row.structural),
+        categoryPk
+      );
+      fillSelect(
+        els.location,
+        state.locations.filter((row) => !row.structural),
+        locationPk
+      );
+      fillPartSelect(partRows, preview.part?.pk);
+      renderImage(source);
+      renderParameters(source.parameters || {});
+
+      els.existingPart.disabled = Boolean(preview.part);
+      syncCategoryState();
+      els.allowDuplicate.checked = false;
+      els.receive.classList.toggle('danger', Boolean(preview.duplicate_stock_item));
+
+      if (preview.auto_receive) {
+        receiveCurrent(true);
+      }
+    }
+
+    async function previewCurrent(options = {}) {
+      const announce = options.announce !== false;
+      const barcode = els.barcode.value.trim();
+      if (!barcode) {
+        setMessage('Barcode required', 'error');
+        return;
+      }
+
+      if (announce) {
+        setMessage('Previewing...');
+      }
+      const preview = await postJson('preview/', { barcode });
+      renderPreview(preview);
+      if (announce) {
+        setMessage(preview.auto_receive ? 'Auto receiving...' : 'Ready', preview.auto_receive ? '' : 'ok');
+      }
+    }
+
+    async function receiveCurrent(auto = false) {
+      const preview = state.preview;
+      if (!preview) {
+        return;
+      }
+
+      const payload = {
+        barcode: els.barcode.value.trim(),
+        category_id: els.category.value || null,
+        part_id: els.existingPart.value || null,
+        location_id: els.location.value || null,
+        quantity: els.quantity.value || null,
+        allow_duplicate: els.allowDuplicate.checked,
+        use_supplier_image: els.useImage.checked && !els.useImage.disabled
+      };
+
+      if (!preview.part && !payload.part_id && !payload.category_id) {
+        setMessage('Category required', 'error');
+        return;
+      }
+
+      if (preview.duplicate_stock_item && !payload.allow_duplicate) {
+        setMessage('Duplicate barcode blocked', 'error');
+        return;
+      }
+
+      els.receive.disabled = true;
+      setMessage(auto ? 'Auto receiving...' : 'Receiving...');
+      try {
+        const result = await postJson('receive/', payload);
+        await previewCurrent({ announce: false });
+        setReceiveMessage(result);
+      } catch (error) {
+        setMessage(error.message, error.status === 409 ? 'error' : 'error');
+        if (error.body?.duplicate_stock_item) {
+          els.duplicateStatus.textContent = error.body.duplicate_stock_item.label;
+        }
+      } finally {
+        els.receive.disabled = false;
+      }
+    }
+
+    async function searchParts() {
+      const query = els.partSearch.value.trim();
+      if (query.length < 2) {
+        setMessage('Enter at least two characters to search parts', 'error');
+        return;
+      }
+
+      const current = Array.from(els.existingPart.options)
+        .filter((option) => option.value)
+        .map((option) => ({
+          pk: option.value,
+          label: option.textContent
+        }));
+      setMessage('Searching parts...');
+      const result = await getJson(`parts/?q=${encodeURIComponent(query)}`);
+      fillPartSelect(mergeParts([...(result.parts || []), ...current]), els.existingPart.value);
+      syncCategoryState();
+      setMessage((result.parts || []).length ? 'Part search ready' : 'No part search results', (result.parts || []).length ? 'ok' : '');
+    }
+
+    function clearPage() {
+      state.preview = null;
+      els.previewSection.classList.add('hidden');
+      els.barcode.value = '';
+      window.history.replaceState({}, '', window.location.pathname);
+      setMessage('');
+      els.barcode.focus();
+    }
+
+    async function init() {
+      const [categories, locations] = await Promise.all([
+        getJson('categories/'),
+        getJson('locations/')
+      ]);
+      state.categories = categories.categories || [];
+      state.locations = locations.locations || [];
+      fillSelect(els.category, state.categories.filter((row) => !row.structural), null);
+      fillSelect(els.location, state.locations.filter((row) => !row.structural), null);
+
+      const initialBarcode = new URLSearchParams(window.location.search).get('barcode');
+      if (initialBarcode) {
+        els.barcode.value = initialBarcode;
+        await previewCurrent();
+      }
+
+      els.barcode.focus();
+    }
+
+    els.form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      previewCurrent().catch((error) => setMessage(error.message, 'error'));
+    });
+    els.receive.addEventListener('click', () => receiveCurrent().catch((error) => setMessage(error.message, 'error')));
+    els.clear.addEventListener('click', clearPage);
+    els.existingPart.addEventListener('change', syncCategoryState);
+    els.partSearchButton.addEventListener('click', () => searchParts().catch((error) => setMessage(error.message, 'error')));
+    els.partSearch.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        searchParts().catch((error) => setMessage(error.message, 'error'));
+      }
+    });
+
+    init().catch((error) => setMessage(error.message, 'error'));
+  </script>
+</body>
+</html>

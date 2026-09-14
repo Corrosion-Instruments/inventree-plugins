@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventree-supplier-scan"
+version = "0.1.0"
+description = "Supplier barcode scanning for Corrosion Instruments InvenTree"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Corrosion Instruments"}]
+dependencies = ["requests>=2.28"]
+
+[project.entry-points.inventree_plugins]
+SupplierScanPlugin = "inventree_supplier_scan.plugin:SupplierScanPlugin"
+
+[tool.setuptools]
+packages = ["inventree_supplier_scan"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+inventree_supplier_scan = [
+    "static/*",
+    "templates/inventree_supplier_scan/*",
+]
