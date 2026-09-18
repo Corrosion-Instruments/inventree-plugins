@@ -163,15 +163,26 @@
       el.message.style.display = text ? 'block' : 'none';
       if (text) window.scrollTo({top:0, behavior:'smooth'});
     }
+    async function readJson(response) {
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        const hint = text.trim().startsWith('<')
+          ? 'The server returned an HTML page. Restart the InvenTree web container after updating the plugin, then refresh this page.'
+          : 'The server returned a response that was not valid JSON.';
+        throw new Error(`${hint} (HTTP ${response.status})`);
+      }
+    }
     async function getJson(url) {
       const response = await fetch(url);
-      const body = await response.json();
+      const body = await readJson(response);
       if (!response.ok) throw new Error(body.error || 'Request failed');
       return body;
     }
     async function postJson(url, payload) {
       const response = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf()}, body:JSON.stringify(payload)});
-      const body = await response.json();
+      const body = await readJson(response);
       if (!response.ok) throw new Error(body.error || 'Request failed');
       return body;
     }
@@ -211,6 +222,10 @@
         const details = Object.entries(result.checks || {}).map(([name,check]) => `${labels[name] || name}: ${check.ok ? 'OK' : check.message}`);
         el['connection-result'].textContent = [result.message, ...saved, ...details].join(' · ');
         el['connection-result'].style.color = result.ok ? 'var(--ok)' : 'var(--danger)';
+      } catch (error) {
+        el['connection-result'].textContent = `Test failed: ${error.message}`;
+        el['connection-result'].style.color = 'var(--danger)';
+        throw error;
       } finally {
         el['test-connection'].disabled = false;
       }
