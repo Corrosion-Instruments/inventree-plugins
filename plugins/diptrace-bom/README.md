@@ -9,6 +9,14 @@ This plugin provides a guarded workflow for turning a DipTrace CSV/XLSX export i
 5. Manually resolve ambiguous/unmatched rows (or explicitly create them when enabled).
 6. Merge into or replace the assembly BOM in one database transaction.
 
+## Private inventory diagnostic
+
+Use **Diagnose private inventory** on the plugin page to query a single JLCPCB
+C-code with a fresh, uncached private-library request. The result reports whether
+the code was returned, how many library entries were scanned, the documented
+inventory buckets, and the returned field names. Stored API credentials and the
+unrestricted API response are never returned to the browser.
+
 The private JLCPCB inventory is displayed as external availability. It is **not** added to InvenTree physical stock.
 
 ## Installation

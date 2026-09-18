@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from django.core import signing
 from django.core.exceptions import ValidationError
@@ -16,7 +17,7 @@ from plugin import InvenTreePlugin
 from plugin.mixins import NavigationMixin, SettingsMixin, UrlsMixin, UserInterfaceMixin
 
 from .parser import BomParseError, parse_bom
-from .jlcpcb import JlcApiError, JlcClient
+from .jlcpcb import JlcApiError, JlcClient, private_inventory_diagnostic
 from .services import BomImportError, BomImportService
 
 __all__ = []
@@ -35,7 +36,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Normalize DipTrace BOMs and check InvenTree / JLCPCB availability"
-    VERSION = "0.1.2"
+    VERSION = "0.1.3"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -182,6 +183,44 @@ class DipTraceBomPlugin(
             }
         )
 
+    def diagnose_private_inventory(self, request):
+        """Query one C-code without exposing credentials or unrestricted API data."""
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+        try:
+            data = json_request(request)
+        except BomImportError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        component_code = str(data.get("component_code") or "").strip().upper()
+        if not re.fullmatch(r"C\d{1,20}", component_code):
+            return JsonResponse(
+                {"error": "Enter a valid JLCPCB C-code, for example C9900053998"},
+                status=400,
+            )
+
+        service = BomImportService(self)
+        credentials = service.jlc_credentials()
+        if not credentials.configured:
+            return JsonResponse(
+                {"error": "Configure the JLCPCB App ID, Access Key and Secret Key first"},
+                status=400,
+            )
+
+        client = JlcClient(
+            credentials,
+            host=str(service.setting("JLC_HOST", "https://open.jlcpcb.com")),
+            timeout=int(service.setting("JLC_TIMEOUT", 30)),
+        )
+        try:
+            # Intentionally bypass the normal five-minute cache so this is a fresh diagnostic.
+            library = client.private_library()
+            result = private_inventory_diagnostic(component_code, library)
+            result["fresh_request"] = True
+            return JsonResponse(result)
+        except JlcApiError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+
     def finalize(self, request):
         if not request.user.is_authenticated:
             return JsonResponse({"error": "Authentication required"}, status=403)
@@ -259,6 +298,11 @@ class DipTraceBomPlugin(
         return [
             path("", self.index, name="index"),
             path("test-connection/", self.test_connection, name="test-connection"),
+            path(
+                "diagnose-private-inventory/",
+                self.diagnose_private_inventory,
+                name="diagnose-private-inventory",
+            ),
             path("preview/", self.preview, name="preview"),
             path("finalize/", self.finalize, name="finalize"),
             path("parts/", self.parts, name="parts"),

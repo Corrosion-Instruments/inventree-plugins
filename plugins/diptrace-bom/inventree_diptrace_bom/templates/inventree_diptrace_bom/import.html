@@ -79,6 +79,13 @@
         <button id="test-connection" class="secondary" type="button">Test JLCPCB connection</button>
         <span id="connection-result" aria-live="polite"></span>
       </div>
+      <div class="actions">
+        <label class="field" style="min-width:280px">Diagnose private inventory C-code
+          <input id="diagnostic-code" placeholder="C9900053998" autocomplete="off">
+        </label>
+        <button id="diagnose-private" class="secondary" type="button">Diagnose private inventory</button>
+      </div>
+      <pre id="diagnostic-result" class="message" aria-live="polite" style="margin:12px 0 0;white-space:pre-wrap"></pre>
     </section>
     <section>
       <h2>1. Select the product and BOM file</h2>
@@ -150,7 +157,7 @@
       'message','assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','jlc-warning','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
-      'test-connection','connection-result'
+      'test-connection','connection-result','diagnostic-code','diagnose-private','diagnostic-result'
     ].map(id => [id, document.getElementById(id)]));
 
     function csrf() {
@@ -230,6 +237,37 @@
         el['test-connection'].disabled = false;
       }
     }
+    async function diagnosePrivateInventory() {
+      const componentCode = el['diagnostic-code'].value.trim().toUpperCase();
+      if (!/^C\d{1,20}$/.test(componentCode)) throw new Error('Enter a valid JLCPCB C-code, for example C9900053998');
+      el['diagnose-private'].disabled = true;
+      el['diagnostic-result'].className = 'message';
+      el['diagnostic-result'].style.display = 'block';
+      el['diagnostic-result'].textContent = `Checking ${componentCode} in a fresh private-library response…`;
+      try {
+        const result = await postJson('diagnose-private-inventory/', {component_code: componentCode});
+        const inventory = result.inventory || {};
+        const fields = (result.returned_field_names || []).join(', ') || 'none (C-code was not returned)';
+        el['diagnostic-result'].textContent = [
+          `C-code: ${result.component_code}`,
+          `Found in private API response: ${result.found ? 'YES' : 'NO'}`,
+          `Private-library entries scanned: ${result.library_entries_scanned}`,
+          `JLCPCB Parts: ${inventory.jlcpcb_parts || '0'}`,
+          `Global Sourcing: ${inventory.global_sourcing || '0'}`,
+          `Consigned: ${inventory.consigned || '0'}`,
+          `Idle Stock: ${inventory.idle_stock || '0'}`,
+          `Private total: ${inventory.private_total || '0'}`,
+          `Returned field names: ${fields}`,
+        ].join('\n');
+        el['diagnostic-result'].className = `message ${result.found ? 'ok' : 'warn'}`;
+      } catch (error) {
+        el['diagnostic-result'].textContent = `Diagnostic failed: ${error.message}`;
+        el['diagnostic-result'].className = 'message error';
+        throw error;
+      } finally {
+        el['diagnose-private'].disabled = false;
+      }
+    }
     function renderPreview() {
       const data = state.preview; const summary = data.summary;
       el['metric-file'].textContent = data.filename; el['metric-lines'].textContent = summary.line_count;
@@ -300,6 +338,8 @@
     el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>message(error.message,'error'));}});
     el.preview.addEventListener('click',()=>preview().catch(error=>message(error.message,'error')));
     el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>message(error.message,'error')));
+    el['diagnose-private'].addEventListener('click',()=>diagnosePrivateInventory().catch(error=>message(error.message,'error')));
+    el['diagnostic-code'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();diagnosePrivateInventory().catch(error=>message(error.message,'error'));}});
     el['part-search'].addEventListener('click',()=>searchParts().catch(error=>message(error.message,'error')));
     el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>message(error.message,'error'));}});
     el['part-close'].addEventListener('click',()=>el['part-dialog'].close());

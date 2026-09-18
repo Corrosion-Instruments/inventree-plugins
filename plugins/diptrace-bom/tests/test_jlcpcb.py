@@ -8,6 +8,7 @@ from inventree_diptrace_bom.jlcpcb import (
     availability_summary,
     compact_json,
     make_signature,
+    private_inventory_diagnostic,
 )
 
 
@@ -43,6 +44,32 @@ class JlcTests(unittest.TestCase):
             },
         }
         self.assertEqual(_component_rows(payload)[0]["componentCode"], "C77014")
+
+    def test_private_inventory_diagnostic_reports_safe_stock_fields(self):
+        result = private_inventory_diagnostic(
+            "c9900053998",
+            {
+                "C9900053998": {
+                    "componentCode": "C9900053998",
+                    "componentModel": "XIAO-nRF52840",
+                    "jlcpcbParts": 0,
+                    "globalSourcingParts": 0,
+                    "consignedParts": 73,
+                    "idleStock": 0,
+                }
+            },
+        )
+        self.assertTrue(result["found"])
+        self.assertEqual(result["inventory"]["consigned"], "73")
+        self.assertEqual(result["inventory"]["private_total"], "73")
+        self.assertIn("consignedParts", result["returned_field_names"])
+        self.assertNotIn("componentModel", result["inventory"])
+
+    def test_private_inventory_diagnostic_reports_missing_code(self):
+        result = private_inventory_diagnostic("C123", {"C999": {"componentCode": "C999"}})
+        self.assertFalse(result["found"])
+        self.assertEqual(result["library_entries_scanned"], 1)
+        self.assertEqual(result["returned_field_names"], [])
 
 
 if __name__ == "__main__":

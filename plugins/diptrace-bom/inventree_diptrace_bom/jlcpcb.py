@@ -170,6 +170,38 @@ def availability_summary(public: dict | None, private: dict | None) -> dict:
     }
 
 
+def private_inventory_diagnostic(component_code: str, library: dict[str, dict]) -> dict:
+    """Return a credential-safe diagnostic for one private-library component."""
+    code = str(component_code or "").strip().upper()
+    item = library.get(code)
+    diagnostic = {
+        "component_code": code,
+        "found": item is not None,
+        "library_entries_scanned": len(library),
+        "returned_field_names": sorted(str(key) for key in (item or {}).keys()),
+        "inventory": {
+            "jlcpcb_parts": "0",
+            "global_sourcing": "0",
+            "consigned": "0",
+            "idle_stock": "0",
+            "private_total": "0",
+        },
+    }
+    if item is not None:
+        summary = availability_summary(None, item)
+        diagnostic["inventory"] = {
+            key: str(summary[key])
+            for key in (
+                "jlcpcb_parts",
+                "global_sourcing",
+                "consigned",
+                "idle_stock",
+                "private_total",
+            )
+        }
+    return diagnostic
+
+
 def _component_rows(payload: Any) -> list[dict]:
     """Find the component list in the documented response envelope."""
     preferred_keys = (
