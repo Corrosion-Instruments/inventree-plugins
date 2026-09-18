@@ -80,12 +80,10 @@
         <span id="connection-result" aria-live="polite"></span>
       </div>
       <div class="actions">
-        <label class="field" style="min-width:280px">Diagnose private inventory C-code
-          <input id="diagnostic-code" placeholder="C9900053998" autocomplete="off">
-        </label>
-        <button id="diagnose-private" class="secondary" type="button">Diagnose private inventory</button>
+        <button id="sync-stock" class="secondary" type="button">Sync JLCPCB stock now</button>
+        <span id="sync-result" aria-live="polite"></span>
       </div>
-      <pre id="diagnostic-result" class="message" aria-live="polite" style="margin:12px 0 0;white-space:pre-wrap"></pre>
+      <p style="color:var(--muted);margin-bottom:0">The sync only updates plugin-managed external stock for exact, existing JLC supplier-SKU matches. It never changes local stock or creates catalog parts.</p>
     </section>
     <section>
       <h2>1. Select the product and BOM file</h2>
@@ -157,7 +155,7 @@
       'message','assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','jlc-warning','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
-      'test-connection','connection-result','diagnostic-code','diagnose-private','diagnostic-result'
+      'test-connection','connection-result','sync-stock','sync-result'
     ].map(id => [id, document.getElementById(id)]));
 
     function csrf() {
@@ -237,55 +235,26 @@
         el['test-connection'].disabled = false;
       }
     }
-    async function diagnosePrivateInventory() {
-      const componentCode = el['diagnostic-code'].value.trim().toUpperCase();
-      if (!/^C\d{1,20}$/.test(componentCode)) throw new Error('Enter a valid JLCPCB C-code, for example C9900053998');
-      el['diagnose-private'].disabled = true;
-      el['diagnostic-result'].className = 'message';
-      el['diagnostic-result'].style.display = 'block';
-      el['diagnostic-result'].textContent = `Checking ${componentCode} in a fresh private-library response…`;
+    async function syncStock() {
+      el['sync-stock'].disabled = true;
+      el['sync-result'].textContent = 'Syncing…';
       try {
-        const result = await postJson('diagnose-private-inventory/', {component_code: componentCode});
-        const inventory = result.inventory || {};
-        const fields = (result.returned_field_names || []).join(', ') || 'none (C-code was not returned)';
-        const pages = result.response_pages || [];
-        const pageDetails = pages.flatMap(page => {
-          const pagination = Object.entries(page.pagination || {}).map(([name,value]) => `${name}=${value}`).join(', ') || 'none';
-          const containers = (page.response_containers || []).map(container => {
-            const fields = container.field_names || container.item_field_names || [];
-            const detail = container.type === 'list' ? `length=${container.length}` : `fields=${fields.join(', ') || 'none'}`;
-            return `${container.path} (${container.type}; ${detail})`;
-          }).join(' | ') || 'none';
-          return [
-            `Support trace: AppId ${page.app_id || 'unknown'}; interface POST ${page.interface || 'unknown'}`,
-            `Call time (UTC): ${page.call_time_utc || 'unknown'}; J-Trace-ID: ${page.j_trace_id || 'not returned'}`,
-            `API result: code ${page.api_code}; message ${page.api_message || '(empty)'}`,
-            `Page ${page.requested_page}: HTTP ${page.http_status}; API code ${page.api_code}; content type ${page.content_type || 'unknown'}`,
-            `Page ${page.requested_page} parser: ${page.extracted_rows} row(s), ${page.identified_components} identified component(s)`,
-            `Page ${page.requested_page} pagination: ${pagination}`,
-            `Page ${page.requested_page} response shape: ${containers}${page.shape_truncated ? ' | …truncated' : ''}`,
-          ];
-        });
-        el['diagnostic-result'].textContent = [
-          `C-code: ${result.component_code}`,
-          `Found in private API response: ${result.found ? 'YES' : 'NO'}`,
-          `Private-library entries scanned: ${result.library_entries_scanned}`,
-          `Pages requested: ${result.pages_requested || 0}`,
-          `JLCPCB Parts: ${inventory.jlcpcb_parts || '0'}`,
-          `Global Sourcing: ${inventory.global_sourcing || '0'}`,
-          `Consigned: ${inventory.consigned || '0'}`,
-          `Idle Stock: ${inventory.idle_stock || '0'}`,
-          `Private total: ${inventory.private_total || '0'}`,
-          `Returned field names: ${fields}`,
-          ...pageDetails,
-        ].join('\n');
-        el['diagnostic-result'].className = `message ${result.found ? 'ok' : 'warn'}`;
+        const result = await postJson('sync-stock/', {});
+        el['sync-result'].textContent = [
+          `${result.api_components} API component(s)`,
+          `${result.matched_components} matched`,
+          `${result.created} created`,
+          `${result.updated} updated`,
+          `${result.unchanged} unchanged`,
+          `${result.unmatched_components} without an existing supplier SKU`,
+        ].join(' · ');
+        el['sync-result'].style.color = 'var(--ok)';
       } catch (error) {
-        el['diagnostic-result'].textContent = `Diagnostic failed: ${error.message}`;
-        el['diagnostic-result'].className = 'message error';
+        el['sync-result'].textContent = `Sync failed: ${error.message}`;
+        el['sync-result'].style.color = 'var(--danger)';
         throw error;
       } finally {
-        el['diagnose-private'].disabled = false;
+        el['sync-stock'].disabled = false;
       }
     }
     function renderPreview() {
@@ -358,8 +327,7 @@
     el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>message(error.message,'error'));}});
     el.preview.addEventListener('click',()=>preview().catch(error=>message(error.message,'error')));
     el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>message(error.message,'error')));
-    el['diagnose-private'].addEventListener('click',()=>diagnosePrivateInventory().catch(error=>message(error.message,'error')));
-    el['diagnostic-code'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();diagnosePrivateInventory().catch(error=>message(error.message,'error'));}});
+    el['sync-stock'].addEventListener('click',()=>syncStock().catch(error=>message(error.message,'error')));
     el['part-search'].addEventListener('click',()=>searchParts().catch(error=>message(error.message,'error')));
     el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>message(error.message,'error'));}});
     el['part-close'].addEventListener('click',()=>el['part-dialog'].close());

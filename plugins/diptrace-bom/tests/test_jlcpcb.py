@@ -7,24 +7,19 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from inventree_diptrace_bom.jlcpcb import (
+    JlcApiError,
     JlcClient,
     JlcCredentials,
     _component_rows,
     availability_summary,
     compact_json,
     make_signature,
-    private_inventory_diagnostic,
-    response_shape_summary,
+    private_stock_quantities,
 )
 
 
 class FakeResponse:
     status_code = 200
-    headers = {
-        "Content-Type": "application/json; charset=utf-8",
-        "J-Trace-ID": "trace-support-123",
-    }
-
     def raise_for_status(self):
         return None
 
@@ -41,24 +36,40 @@ class FakeSession:
         return FakeResponse()
 
 
+class FullPageResponse(FakeResponse):
+    def json(self):
+        rows = [{"componentCode": f"C{index}"} for index in range(100)]
+        return {"code": 200, "message": "success", "data": {"records": rows}}
+
+
+class FullPageSession(FakeSession):
+    def post(self, *args, **kwargs):
+        self.last_kwargs = kwargs
+        return FullPageResponse()
+
+
 class JlcTests(unittest.TestCase):
-    def test_private_diagnostic_includes_support_trace_without_credentials(self):
+    def test_private_library_uses_jlcpcb_max_page_size(self):
         session = FakeSession()
         client = JlcClient(
             JlcCredentials("app-123", "access-secret", "signing-secret"),
             session=session,
         )
         with patch.dict(sys.modules, {"requests": SimpleNamespace(RequestException=Exception)}):
-            result = client.diagnose_private_library("C9900053998")
-        page = result["response_pages"][0]
-        self.assertEqual(page["app_id"], "app-123")
-        self.assertEqual(page["interface"], client.PRIVATE_PATH)
-        self.assertEqual(page["j_trace_id"], "trace-support-123")
-        self.assertEqual(page["api_message"], "success")
+            result = client.private_library()
+        self.assertEqual(result, {})
         self.assertIn('"pageSize":100', session.last_kwargs["data"].decode("utf-8"))
-        self.assertRegex(page["call_time_utc"], r"^\d{4}-\d{2}-\d{2}T")
         self.assertNotIn("access-secret", repr(result))
         self.assertNotIn("signing-secret", repr(result))
+
+    def test_incomplete_private_snapshot_is_rejected(self):
+        client = JlcClient(
+            JlcCredentials("app-123", "access-secret", "signing-secret"),
+            session=FullPageSession(),
+        )
+        with patch.dict(sys.modules, {"requests": SimpleNamespace(RequestException=Exception)}):
+            with self.assertRaisesRegex(JlcApiError, "pagination safety limit"):
+                client.private_library(max_pages=1)
 
     def test_signature_uses_documented_canonical_form(self):
         body = compact_json({"componentCodes": ["C77014"]})
@@ -92,63 +103,23 @@ class JlcTests(unittest.TestCase):
         }
         self.assertEqual(_component_rows(payload)[0]["componentCode"], "C77014")
 
-    def test_private_inventory_diagnostic_reports_safe_stock_fields(self):
-        result = private_inventory_diagnostic(
-            "c9900053998",
+    def test_private_stock_quantities_maps_only_managed_buckets(self):
+        result = private_stock_quantities(
             {
-                "C9900053998": {
-                    "componentCode": "C9900053998",
-                    "componentModel": "XIAO-nRF52840",
-                    "jlcpcbParts": 0,
-                    "globalSourcingParts": 0,
-                    "consignedParts": 73,
-                    "idleStock": 0,
-                }
-            },
-        )
-        self.assertTrue(result["found"])
-        self.assertEqual(result["inventory"]["consigned"], "73")
-        self.assertEqual(result["inventory"]["private_total"], "73")
-        self.assertIn("consignedParts", result["returned_field_names"])
-        self.assertNotIn("componentModel", result["inventory"])
-
-    def test_private_inventory_diagnostic_reports_missing_code(self):
-        result = private_inventory_diagnostic("C123", {"C999": {"componentCode": "C999"}})
-        self.assertFalse(result["found"])
-        self.assertEqual(result["library_entries_scanned"], 1)
-        self.assertEqual(result["returned_field_names"], [])
-
-    def test_response_shape_summary_reports_structure_without_values(self):
-        result = response_shape_summary(
-            {
-                "code": 200,
-                "accessKey": "do-not-return",
-                "data": {
-                    "currentPage": 1,
-                    "pageSize": 10,
-                    "totalCount": 73,
-                    "privateRows": [
-                        {
-                            "componentCode": "C9900053998",
-                            "consignedParts": 73,
-                            "secretToken": "do-not-return",
-                        }
-                    ],
-                },
+                "jlcpcbParts": 2,
+                "globalSourcingParts": {"quantity": 3},
+                "consignedParts": [{"available": 73}],
+                "idleStock": 99,
             }
         )
-        root = next(item for item in result["response_containers"] if item["path"] == "$")
-        row_list = next(
-            item
-            for item in result["response_containers"]
-            if item["path"] == "$.data.privateRows"
-        )
-        self.assertEqual(root["field_names"], ["code", "data"])
-        self.assertEqual(root["redacted_field_count"], 1)
-        self.assertEqual(row_list["length"], 1)
-        self.assertEqual(row_list["item_field_names"], ["componentCode", "consignedParts"])
-        self.assertEqual(result["pagination"]["$.data.totalCount"], "73")
-        self.assertNotIn("do-not-return", repr(result))
+        self.assertEqual(str(result["private"]), "2")
+        self.assertEqual(str(result["global"]), "3")
+        self.assertEqual(str(result["consigned"]), "73")
+        self.assertNotIn("idle", result)
+
+    def test_invalid_private_quantity_is_rejected_before_stock_changes(self):
+        with self.assertRaisesRegex(JlcApiError, "invalid consignedParts quantity"):
+            private_stock_quantities({"consignedParts": "not-a-number"})
 
 
 if __name__ == "__main__":

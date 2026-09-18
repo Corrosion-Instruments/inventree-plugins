@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import re
+import logging
 
 from django.core import signing
 from django.core.exceptions import ValidationError
@@ -14,16 +14,25 @@ from django.urls import path
 from django.utils.translation import gettext_lazy as _
 
 from plugin import InvenTreePlugin
-from plugin.mixins import NavigationMixin, SettingsMixin, UrlsMixin, UserInterfaceMixin
+from plugin.mixins import (
+    NavigationMixin,
+    ScheduleMixin,
+    SettingsMixin,
+    UrlsMixin,
+    UserInterfaceMixin,
+)
 
-from .parser import BomParseError, parse_bom
 from .jlcpcb import JlcApiError, JlcClient
+from .parser import BomParseError, parse_bom
 from .services import BomImportError, BomImportService
+from .stock_sync import JlcStockSyncError, JlcStockSyncService
 
 __all__ = []
+logger = logging.getLogger(__name__)
 
 
 class DipTraceBomPlugin(
+    ScheduleMixin,
     SettingsMixin,
     UrlsMixin,
     NavigationMixin,
@@ -35,14 +44,22 @@ class DipTraceBomPlugin(
     NAME = "DipTraceBomPlugin"
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
-    DESCRIPTION = "Normalize DipTrace BOMs and check InvenTree / JLCPCB availability"
-    VERSION = "0.1.6"
+    DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
+    VERSION = "0.2.0"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
     NAVIGATION_TAB_NAME = "DipTrace BOM"
     NAVIGATION_TAB_ICON = "fas fa-list-check"
     NAVIGATION = [{"name": "DipTrace BOM", "link": "plugin:diptrace-bom:index"}]
+
+    SCHEDULED_TASKS = {
+        "jlc-stock-sync": {
+            "func": "sync_jlc_stock",
+            "schedule": "I",
+            "minutes": 30,
+        }
+    }
 
     SETTINGS = {
         "JLC_APP_ID": {
@@ -79,6 +96,29 @@ class DipTraceBomPlugin(
             "description": _("Supplier company whose SKU is the DipTrace JLCPCB Part #"),
             "model": "company.company",
             "model_filters": {"is_supplier": True},
+        },
+        "ENABLE_JLC_STOCK_SYNC": {
+            "name": _("Enable JLCPCB Stock Sync"),
+            "description": _(
+                "Every 30 minutes, mirror JLCPCB-owned quantities onto exact existing supplier-SKU matches"
+            ),
+            "default": False,
+            "validator": bool,
+        },
+        "JLC_CONSIGNED_LOCATION": {
+            "name": _("JLCPCB Consigned Parts Location"),
+            "description": _("External, non-structural location for consignedParts"),
+            "model": "stock.stocklocation",
+        },
+        "JLC_PRIVATE_LOCATION": {
+            "name": _("JLCPCB Private Parts Location"),
+            "description": _("External, non-structural location for jlcpcbParts"),
+            "model": "stock.stocklocation",
+        },
+        "JLC_GLOBAL_LOCATION": {
+            "name": _("JLCPCB Global Sourcing Location"),
+            "description": _("External, non-structural location for globalSourcingParts"),
+            "model": "stock.stocklocation",
         },
         "ALLOW_CREATE_MISSING": {
             "name": _("Allow Missing Part Creation"),
@@ -164,7 +204,14 @@ class DipTraceBomPlugin(
         checks = {}
         probes = (
             ("component_catalogue", lambda: client.component_details(["C25804"])),
-            ("private_inventory", lambda: client.private_library(page_size=1, max_pages=1)),
+            (
+                "private_inventory",
+                lambda: client.private_library(
+                    page_size=1,
+                    max_pages=1,
+                    require_complete=False,
+                ),
+            ),
         )
         for name, probe in probes:
             try:
@@ -183,42 +230,44 @@ class DipTraceBomPlugin(
             }
         )
 
-    def diagnose_private_inventory(self, request):
-        """Query one C-code without exposing credentials or unrestricted API data."""
+    def sync_jlc_stock(self, *args, **kwargs):
+        """Scheduled entry point for the JLCPCB external-stock reconciliation."""
+        try:
+            enabled = bool(self.get_setting("ENABLE_JLC_STOCK_SYNC", cache=False))
+        except Exception:
+            enabled = False
+        if not enabled:
+            return {"skipped": True, "message": "JLCPCB stock sync is disabled"}
+        return JlcStockSyncService(self).sync()
+
+    def sync_stock(self, request):
+        """Run the same reconciliation immediately for an authorized user."""
         if not request.user.is_authenticated:
             return JsonResponse({"error": "Authentication required"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+
+        from stock.models import StockItem
+        from users.permissions import check_user_permission
+
+        for action in ("add", "change"):
+            if not check_user_permission(request.user, StockItem, action):
+                return JsonResponse({"error": f"Missing stock {action} permission"}, status=403)
+
         try:
-            data = json_request(request)
-        except BomImportError as exc:
+            return JsonResponse(JlcStockSyncService(self).sync(user=request.user))
+        except JlcStockSyncError as exc:
             return JsonResponse({"error": str(exc)}, status=400)
-
-        component_code = str(data.get("component_code") or "").strip().upper()
-        if not re.fullmatch(r"C\d{1,20}", component_code):
-            return JsonResponse(
-                {"error": "Enter a valid JLCPCB C-code, for example C9900053998"},
-                status=400,
-            )
-
-        service = BomImportService(self)
-        credentials = service.jlc_credentials()
-        if not credentials.configured:
-            return JsonResponse(
-                {"error": "Configure the JLCPCB App ID, Access Key and Secret Key first"},
-                status=400,
-            )
-
-        client = JlcClient(
-            credentials,
-            host=str(service.setting("JLC_HOST", "https://open.jlcpcb.com")),
-            timeout=int(service.setting("JLC_TIMEOUT", 30)),
-        )
-        try:
-            # Intentionally bypass the normal five-minute cache so this is a fresh diagnostic.
-            result = client.diagnose_private_library(component_code)
-            result["fresh_request"] = True
-            return JsonResponse(result)
         except JlcApiError as exc:
             return JsonResponse({"error": str(exc)}, status=502)
+        except ValidationError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception:
+            logger.exception("Unexpected JLCPCB stock synchronization failure")
+            return JsonResponse(
+                {"error": "Stock sync failed unexpectedly; check the InvenTree server log"},
+                status=500,
+            )
 
     def finalize(self, request):
         if not request.user.is_authenticated:
@@ -297,11 +346,7 @@ class DipTraceBomPlugin(
         return [
             path("", self.index, name="index"),
             path("test-connection/", self.test_connection, name="test-connection"),
-            path(
-                "diagnose-private-inventory/",
-                self.diagnose_private_inventory,
-                name="diagnose-private-inventory",
-            ),
+            path("sync-stock/", self.sync_stock, name="sync-stock"),
             path("preview/", self.preview, name="preview"),
             path("finalize/", self.finalize, name="finalize"),
             path("parts/", self.parts, name="parts"),

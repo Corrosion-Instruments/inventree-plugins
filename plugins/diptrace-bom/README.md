@@ -9,22 +9,24 @@ This plugin provides a guarded workflow for turning a DipTrace CSV/XLSX export i
 5. Manually resolve ambiguous/unmatched rows (or explicitly create them when enabled).
 6. Merge into or replace the assembly BOM in one database transaction.
 
-## Private inventory diagnostic
+## JLCPCB stock synchronization
 
-Use **Diagnose private inventory** on the plugin page to query a single JLCPCB
-C-code with a fresh, uncached private-library request. The result reports whether
-the code was returned, how many library entries were scanned, the documented
-inventory buckets, and the returned field names. Stored API credentials and the
-unrestricted API response are never returned to the browser.
+The plugin can mirror the three JLCPCB-owned inventory buckets into InvenTree
+external stock locations every 30 minutes:
 
-Private-library requests use JLCPCB's enforced maximum page size of 100 records.
+- `consignedParts` → Consigned Parts
+- `jlcpcbParts` → JLCPCB Private Parts
+- `globalSourcingParts` → Global Sourcing Reserved
 
-The diagnostic also reports safe support metadata: call time, J-Trace-ID, AppId,
-interface, API message, HTTP/API status, container field names, list lengths,
-pagination values, and parser row counts.
-It never returns raw component values, authorization data, or stored secrets.
+Only existing `SupplierPart` records belonging to the configured JLC/LCSC
+supplier are eligible, and the supplier SKU must exactly match the JLCPCB C-code.
+The sync creates a managed `StockItem` when a matched quantity first becomes
+positive, then updates it only when the quantity changes. It does not create
+master Parts or Supplier Parts and never modifies ordinary local stock.
 
-The private JLCPCB inventory is displayed as external availability. It is **not** added to InvenTree physical stock.
+After a complete successful API snapshot, a managed quantity which disappeared
+or became zero is set to zero. If the API request fails or the complete snapshot
+cannot be confirmed, the database is left unchanged.
 
 ## Installation
 
@@ -48,7 +50,21 @@ Configure these under **Admin Center → Plugins → DipTrace BOM → Settings**
 - `JLCPCB Access Key`
 - `JLCPCB Secret Key` (the `secretKey` from the API key pair, not an RSA private key)
 - `JLC / LCSC Supplier` (the supplier whose SKU stores the `C12345` code)
+- `JLCPCB Consigned Parts Location`
+- `JLCPCB Private Parts Location`
+- `JLCPCB Global Sourcing Location`
+- `Enable JLCPCB Stock Sync`
 - optionally enable `Allow Missing Part Creation` and choose a `Default Component Category`
+
+Create the three locations as non-structural children under a `JLCPCB` parent and
+mark each child location as **External**. Each bucket must use a different
+location. External stock participates in InvenTree's normal available-stock and
+can-build calculations, while remaining visibly separate from company storage.
+
+Also enable **Admin Center → Plugin Settings → Enable schedule integration** and
+run an InvenTree background worker. Restart both the web server and worker after
+installing or updating the plugin. Use **Sync JLCPCB stock now** for an immediate
+authorized run; scheduled runs use the same reconciliation logic.
 
 The three API values are protected settings stored by InvenTree. Never commit them to this repository.
 Protected values intentionally appear as `***` in the admin interface and cannot be read back in the browser.
@@ -59,7 +75,9 @@ The client uses the official JLCPCB Open API endpoints:
 - `/overseas/openapi/component/getComponentDetailByCode`
 - `/overseas/openapi/component/getPrivateComponentLibrary`
 
-Public catalogue results are cached for 15 minutes and the private library for 5 minutes to avoid excessive API traffic.
+Public catalogue results are cached for 15 minutes and importer previews cache
+the private library for 5 minutes. Stock synchronization always requests a fresh,
+complete private-library snapshot using JLCPCB's maximum page size of 100.
 
 ## Matching rules
 
@@ -79,6 +97,9 @@ Fuzzy matches are never committed automatically. Ambiguous and unmatched rows mu
 - Finalization rechecks every selected part inside one database transaction.
 - Replace mode requires BOM delete permission and shows an additional confirmation.
 - Creating missing parts is disabled by default and requires part/supplier-part add permissions.
+- Stock synchronization only owns rows whose batch marker starts with `DIPTRACE-JLC:`.
+- Duplicate supplier SKUs are treated as ambiguous and are not changed.
+- Only a complete successful private-library response can zero managed stock.
 - Credentials never leave the server-side plugin code.
 
 ## Tests

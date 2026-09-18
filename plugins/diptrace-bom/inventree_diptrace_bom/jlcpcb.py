@@ -6,7 +6,6 @@ import base64
 import hashlib
 import hmac
 import json
-import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -89,8 +88,19 @@ class JlcClient:
                     result[code] = item
         return result
 
-    def private_library(self, page_size: int = 100, max_pages: int = 100) -> dict[str, dict]:
+    def private_library(
+        self,
+        page_size: int = 100,
+        max_pages: int = 100,
+        *,
+        require_complete: bool = True,
+    ) -> dict[str, dict]:
         """Fetch the user's private JLC component library, indexed by C-code."""
+        if not 1 <= page_size <= 100:
+            raise JlcApiError("JLCPCB private-library page size must be between 1 and 100")
+        if max_pages < 1:
+            raise JlcApiError("JLCPCB private-library max pages must be at least 1")
+
         result: dict[str, dict] = {}
         for page in range(1, max_pages + 1):
             payload = self._post(
@@ -103,72 +113,22 @@ class JlcClient:
                 if code:
                     result[code] = item
             if len(rows) < page_size:
-                break
-        return result
+                return result
 
-    def diagnose_private_library(
-        self,
-        component_code: str,
-        *,
-        page_size: int = 100,
-        max_pages: int = 100,
-    ) -> dict:
-        """Fetch private inventory with a credential-safe response-shape report."""
-        library: dict[str, dict] = {}
-        page_reports: list[dict] = []
-        for page in range(1, max_pages + 1):
-            payload, transport = self._post_with_transport(
-                self.PRIVATE_PATH,
-                {"currentPage": page, "pageSize": page_size},
+        if require_complete:
+            raise JlcApiError(
+                "JLCPCB private-library response exceeded the pagination safety limit; "
+                "stock was not changed"
             )
-            rows = _component_rows(payload)
-            for item in rows:
-                code = str(item.get("componentCode") or item.get("component_code") or "").upper()
-                if code:
-                    library[code] = item
-
-            shape = response_shape_summary(payload)
-            page_reports.append(
-                {
-                    "requested_page": page,
-                    "requested_page_size": page_size,
-                    "call_time_utc": transport["call_time_utc"],
-                    "app_id": self.credentials.app_id,
-                    "interface": self.PRIVATE_PATH,
-                    "http_status": transport["http_status"],
-                    "content_type": transport["content_type"],
-                    "api_code": _safe_api_code(payload),
-                    "api_message": _safe_api_message(payload),
-                    "j_trace_id": transport["j_trace_id"],
-                    "extracted_rows": len(rows),
-                    "identified_components": sum(
-                        1
-                        for item in rows
-                        if item.get("componentCode") or item.get("component_code")
-                    ),
-                    **shape,
-                }
-            )
-            if len(rows) < page_size:
-                break
-
-        result = private_inventory_diagnostic(component_code, library)
-        result["pages_requested"] = len(page_reports)
-        result["response_pages"] = page_reports
         return result
 
     def _post(self, path: str, payload: dict) -> dict:
-        data, _transport = self._post_with_transport(path, payload)
-        return data
-
-    def _post_with_transport(self, path: str, payload: dict) -> tuple[dict, dict]:
-        """POST to JLCPCB and return JSON plus non-sensitive transport metadata."""
+        """POST a signed JSON request and return the decoded API response."""
         import requests
 
         body = compact_json(payload)
         # JLCPCB signs a Unix timestamp in seconds (not milliseconds).
         timestamp = str(int(time.time()))
-        call_time_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(timestamp)))
         nonce = secrets.token_hex(16)
         signature = make_signature(
             "POST",
@@ -199,16 +159,13 @@ class JlcClient:
         except (requests.RequestException, ValueError) as exc:
             raise JlcApiError(f"JLCPCB API request failed: {exc}") from exc
 
+        if not isinstance(data, dict):
+            raise JlcApiError("JLCPCB API returned an invalid JSON response")
         code = data.get("code")
         if code not in (None, 0, "0", 200, "200"):
             message = data.get("message") or data.get("msg") or f"API code {code}"
             raise JlcApiError(f"JLCPCB API error: {message}")
-        return data, {
-            "call_time_utc": call_time_utc,
-            "http_status": response.status_code,
-            "content_type": str(response.headers.get("Content-Type") or "").split(";", 1)[0],
-            "j_trace_id": str(response.headers.get("J-Trace-ID") or "").strip(),
-        }
+        return data
 
 
 def availability_summary(public: dict | None, private: dict | None) -> dict:
@@ -233,148 +190,41 @@ def availability_summary(public: dict | None, private: dict | None) -> dict:
     }
 
 
-def private_inventory_diagnostic(component_code: str, library: dict[str, dict]) -> dict:
-    """Return a credential-safe diagnostic for one private-library component."""
-    code = str(component_code or "").strip().upper()
-    item = library.get(code)
-    diagnostic = {
-        "component_code": code,
-        "found": item is not None,
-        "library_entries_scanned": len(library),
-        "returned_field_names": sorted(str(key) for key in (item or {}).keys()),
-        "inventory": {
-            "jlcpcb_parts": "0",
-            "global_sourcing": "0",
-            "consigned": "0",
-            "idle_stock": "0",
-            "private_total": "0",
-        },
-    }
-    if item is not None:
-        summary = availability_summary(None, item)
-        diagnostic["inventory"] = {
-            key: str(summary[key])
-            for key in (
-                "jlcpcb_parts",
-                "global_sourcing",
-                "consigned",
-                "idle_stock",
-                "private_total",
-            )
-        }
-    return diagnostic
-
-
-_SENSITIVE_FIELD_MARKERS = (
-    "accesskey",
-    "access_key",
-    "appid",
-    "app_id",
-    "authorization",
-    "credential",
-    "nonce",
-    "secret",
-    "signature",
-    "token",
-)
-
-_PAGINATION_FIELDS = {
-    "currentpage",
-    "page",
-    "pagecount",
-    "pagenum",
-    "pagenumber",
-    "pages",
-    "pagesize",
-    "recordcount",
-    "records",
-    "recordstotal",
-    "total",
-    "totalcount",
-    "totalpages",
-}
-
-
-def response_shape_summary(payload: Any, *, max_depth: int = 4, max_nodes: int = 40) -> dict:
-    """Describe a JSON response without returning any response values or credentials."""
-    containers: list[dict] = []
-    pagination: dict[str, str] = {}
-    queue: list[tuple[str, Any, int]] = [("$", payload, 0)]
-
-    while queue and len(containers) < max_nodes:
-        path, candidate, depth = queue.pop(0)
-        if isinstance(candidate, dict):
-            safe_keys = sorted(
-                str(key) for key in candidate if not _is_sensitive_field(str(key))
-            )
-            containers.append(
-                {
-                    "path": path,
-                    "type": "object",
-                    "field_names": safe_keys,
-                    "redacted_field_count": len(candidate) - len(safe_keys),
-                }
-            )
-            for key, value in candidate.items():
-                key_text = str(key)
-                if _is_sensitive_field(key_text):
-                    continue
-                normalized = re.sub(r"[^a-z0-9]", "", key_text.lower())
-                if normalized in _PAGINATION_FIELDS and _is_safe_scalar(value):
-                    pagination[f"{path}.{key_text}"] = str(value)
-                if depth < max_depth and isinstance(value, (dict, list)):
-                    queue.append((f"{path}.{key_text}", value, depth + 1))
-        elif isinstance(candidate, list):
-            report = {"path": path, "type": "list", "length": len(candidate)}
-            first_mapping = next((item for item in candidate if isinstance(item, dict)), None)
-            if first_mapping is not None:
-                report["item_field_names"] = sorted(
-                    str(key)
-                    for key in first_mapping
-                    if not _is_sensitive_field(str(key))
-                )
-                report["redacted_item_field_count"] = sum(
-                    1 for key in first_mapping if _is_sensitive_field(str(key))
-                )
-                if depth < max_depth:
-                    queue.append((f"{path}[0]", first_mapping, depth + 1))
-            containers.append(report)
-
+def private_stock_quantities(private: dict | None) -> dict[str, Decimal]:
+    """Return the three JLC-owned inventory buckets mirrored into InvenTree."""
+    private = private or {}
     return {
-        "response_containers": containers,
-        "pagination": pagination,
-        "shape_truncated": bool(queue),
+        "private": _stock_bucket_number(private.get("jlcpcbParts"), "jlcpcbParts"),
+        "global": _stock_bucket_number(
+            private.get("globalSourcingParts"), "globalSourcingParts"
+        ),
+        "consigned": _stock_bucket_number(private.get("consignedParts"), "consignedParts"),
     }
 
 
-def _is_sensitive_field(name: str) -> bool:
-    normalized = re.sub(r"[^a-z0-9_]", "", name.lower())
-    return any(marker in normalized for marker in _SENSITIVE_FIELD_MARKERS)
-
-
-def _is_safe_scalar(value: Any) -> bool:
-    return isinstance(value, (int, float)) or (
-        isinstance(value, str) and bool(re.fullmatch(r"-?\d+(?:\.\d+)?", value.strip()))
-    )
-
-
-def _safe_api_code(payload: Any) -> str:
-    if not isinstance(payload, dict):
-        return "not present"
-    value = payload.get("code")
-    return str(value) if _is_safe_scalar(value) else "not present"
-
-
-def _safe_api_message(payload: Any) -> str:
-    """Return only the top-level API message, capped for safe display."""
-    if not isinstance(payload, dict):
-        return ""
-    value = payload.get("message")
-    if value is None:
-        value = payload.get("msg")
-    if not isinstance(value, (str, int, float, bool)):
-        return ""
-    return str(value)[:500]
+def _stock_bucket_number(value: Any, field_name: str) -> Decimal:
+    """Strictly normalize a private-stock bucket before it can change stock."""
+    if value in (None, ""):
+        return Decimal("0")
+    if isinstance(value, dict):
+        for key in ("stockCount", "quantity", "available", "count", "total"):
+            if key in value:
+                return _stock_bucket_number(value[key], field_name)
+        if not value:
+            return Decimal("0")
+        raise JlcApiError(f"JLCPCB returned an unsupported {field_name} value")
+    if isinstance(value, list):
+        return sum(
+            (_stock_bucket_number(item, field_name) for item in value),
+            Decimal("0"),
+        )
+    try:
+        quantity = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise JlcApiError(f"JLCPCB returned an invalid {field_name} quantity") from exc
+    if not quantity.is_finite() or quantity < 0:
+        raise JlcApiError(f"JLCPCB returned an invalid {field_name} quantity")
+    return quantity
 
 
 def _component_rows(payload: Any) -> list[dict]:
