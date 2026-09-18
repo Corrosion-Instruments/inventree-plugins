@@ -73,6 +73,14 @@
   <main>
     <div id="message" class="message"></div>
     <section>
+      <h2>JLCPCB API connection</h2>
+      <p style="color:var(--muted);margin-top:0">Stored credentials are protected by InvenTree and appear as <strong>***</strong>. The saved values cannot be revealed in the browser.</p>
+      <div class="actions">
+        <button id="test-connection" class="secondary" type="button">Test JLCPCB connection</button>
+        <span id="connection-result" aria-live="polite"></span>
+      </div>
+    </section>
+    <section>
       <h2>1. Select the product and BOM file</h2>
       <div class="setup">
         <div>
@@ -141,7 +149,8 @@
     const el = Object.fromEntries([
       'message','assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','jlc-warning','final-section','mode','validate',
-      'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close'
+      'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
+      'test-connection','connection-result'
     ].map(id => [id, document.getElementById(id)]));
 
     function csrf() {
@@ -190,6 +199,21 @@
         const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Preview failed');
         state.preview = body; renderPreview(); message('Preview ready. Review every match before finalizing.', 'ok');
       } finally { el.preview.disabled = false; }
+    }
+    async function testConnection() {
+      el['test-connection'].disabled = true;
+      el['connection-result'].textContent = 'Testing…';
+      try {
+        const result = await postJson('test-connection/', {});
+        const labels = {component_catalogue:'Component catalogue', private_inventory:'Private inventory'};
+        const credentialLabels = {app_id:'App ID', access_key:'Access Key', secret_key:'Secret Key'};
+        const saved = Object.entries(result.configured || {}).map(([name,isSet]) => `${credentialLabels[name] || name}: ${isSet ? 'saved' : 'missing'}`);
+        const details = Object.entries(result.checks || {}).map(([name,check]) => `${labels[name] || name}: ${check.ok ? 'OK' : check.message}`);
+        el['connection-result'].textContent = [result.message, ...saved, ...details].join(' · ');
+        el['connection-result'].style.color = result.ok ? 'var(--ok)' : 'var(--danger)';
+      } finally {
+        el['test-connection'].disabled = false;
+      }
     }
     function renderPreview() {
       const data = state.preview; const summary = data.summary;
@@ -260,6 +284,7 @@
     el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>message(error.message,'error')));
     el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>message(error.message,'error'));}});
     el.preview.addEventListener('click',()=>preview().catch(error=>message(error.message,'error')));
+    el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>message(error.message,'error')));
     el['part-search'].addEventListener('click',()=>searchParts().catch(error=>message(error.message,'error')));
     el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>message(error.message,'error'));}});
     el['part-close'].addEventListener('click',()=>el['part-dialog'].close());

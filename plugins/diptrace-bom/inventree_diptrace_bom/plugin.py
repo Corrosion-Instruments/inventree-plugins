@@ -16,6 +16,7 @@ from plugin import InvenTreePlugin
 from plugin.mixins import NavigationMixin, SettingsMixin, UrlsMixin, UserInterfaceMixin
 
 from .parser import BomParseError, parse_bom
+from .jlcpcb import JlcApiError, JlcClient
 from .services import BomImportError, BomImportService
 
 __all__ = []
@@ -34,7 +35,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Normalize DipTrace BOMs and check InvenTree / JLCPCB availability"
-    VERSION = "0.1.0"
+    VERSION = "0.1.1"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -56,8 +57,8 @@ class DipTraceBomPlugin(
             "protected": True,
         },
         "JLC_TOKENIZATION_KEY": {
-            "name": _("JLCPCB Tokenization Key"),
-            "description": _("HMAC tokenization / secret key used to sign JLCPCB API requests"),
+            "name": _("JLCPCB Secret Key"),
+            "description": _("Secret key from the JLCPCB API key pair (not an RSA private key)"),
             "default": "",
             "protected": True,
         },
@@ -129,6 +130,57 @@ class DipTraceBomPlugin(
             return JsonResponse({"error": str(exc)}, status=400)
         except Exception as exc:
             return JsonResponse({"error": f"Preview failed: {exc}"}, status=500)
+
+    def test_connection(self, request):
+        """Test both JLCPCB endpoints without exposing stored credentials."""
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+
+        service = BomImportService(self)
+        credentials = service.jlc_credentials()
+        configured = {
+            "app_id": bool(credentials.app_id),
+            "access_key": bool(credentials.access_key),
+            "secret_key": bool(credentials.tokenization_key),
+        }
+        if not credentials.configured:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "configured": configured,
+                    "checks": {},
+                    "message": "Enter the App ID, Access Key and Secret Key in plugin settings",
+                }
+            )
+
+        client = JlcClient(
+            credentials,
+            host=str(service.setting("JLC_HOST", "https://open.jlcpcb.com")),
+            timeout=int(service.setting("JLC_TIMEOUT", 30)),
+        )
+        checks = {}
+        probes = (
+            ("component_catalogue", lambda: client.component_details(["C25804"])),
+            ("private_inventory", lambda: client.private_library(page_size=1, max_pages=1)),
+        )
+        for name, probe in probes:
+            try:
+                probe()
+                checks[name] = {"ok": True, "message": "Connected"}
+            except JlcApiError as exc:
+                checks[name] = {"ok": False, "message": str(exc)}
+
+        ok = all(check["ok"] for check in checks.values())
+        return JsonResponse(
+            {
+                "ok": ok,
+                "configured": configured,
+                "checks": checks,
+                "message": "JLCPCB connection successful" if ok else "One or more JLCPCB checks failed",
+            }
+        )
 
     def finalize(self, request):
         if not request.user.is_authenticated:
@@ -206,6 +258,7 @@ class DipTraceBomPlugin(
     def setup_urls(self):
         return [
             path("", self.index, name="index"),
+            path("test-connection/", self.test_connection, name="test-connection"),
             path("preview/", self.preview, name="preview"),
             path("finalize/", self.finalize, name="finalize"),
             path("parts/", self.parts, name="parts"),

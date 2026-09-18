@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "inventree-diptrace-bom"
-version = "0.1.0"
+version = "0.1.1"
 description = "DipTrace BOM import and JLCPCB availability checking for InvenTree"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,4 +23,3 @@ inventree_diptrace_bom = [
     "static/*",
     "templates/inventree_diptrace_bom/*",
 ]
-

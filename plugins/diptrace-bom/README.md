@@ -31,11 +31,13 @@ Configure these under **Admin Center → Plugins → DipTrace BOM → Settings**
 
 - `JLCPCB App ID`
 - `JLCPCB Access Key`
-- `JLCPCB Tokenization Key`
+- `JLCPCB Secret Key` (the `secretKey` from the API key pair, not an RSA private key)
 - `JLC / LCSC Supplier` (the supplier whose SKU stores the `C12345` code)
 - optionally enable `Allow Missing Part Creation` and choose a `Default Component Category`
 
 The three API values are protected settings stored by InvenTree. Never commit them to this repository.
+Protected values intentionally appear as `***` in the admin interface and cannot be read back in the browser.
+Use **Test JLCPCB connection** on the importer page to verify the catalogue and private-inventory permissions.
 
 The client uses the official JLCPCB Open API endpoints:
 
@@ -71,4 +73,3 @@ From this directory:
 ```text
 python -m unittest discover -s tests -v
 ```
-
