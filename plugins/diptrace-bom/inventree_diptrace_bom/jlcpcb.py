@@ -132,9 +132,14 @@ class JlcClient:
                 {
                     "requested_page": page,
                     "requested_page_size": page_size,
+                    "call_time_utc": transport["call_time_utc"],
+                    "app_id": self.credentials.app_id,
+                    "interface": self.PRIVATE_PATH,
                     "http_status": transport["http_status"],
                     "content_type": transport["content_type"],
                     "api_code": _safe_api_code(payload),
+                    "api_message": _safe_api_message(payload),
+                    "j_trace_id": transport["j_trace_id"],
                     "extracted_rows": len(rows),
                     "identified_components": sum(
                         1
@@ -163,6 +168,7 @@ class JlcClient:
         body = compact_json(payload)
         # JLCPCB signs a Unix timestamp in seconds (not milliseconds).
         timestamp = str(int(time.time()))
+        call_time_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(timestamp)))
         nonce = secrets.token_hex(16)
         signature = make_signature(
             "POST",
@@ -198,8 +204,10 @@ class JlcClient:
             message = data.get("message") or data.get("msg") or f"API code {code}"
             raise JlcApiError(f"JLCPCB API error: {message}")
         return data, {
+            "call_time_utc": call_time_utc,
             "http_status": response.status_code,
             "content_type": str(response.headers.get("Content-Type") or "").split(";", 1)[0],
+            "j_trace_id": str(response.headers.get("J-Trace-ID") or "").strip(),
         }
 
 
@@ -355,6 +363,18 @@ def _safe_api_code(payload: Any) -> str:
         return "not present"
     value = payload.get("code")
     return str(value) if _is_safe_scalar(value) else "not present"
+
+
+def _safe_api_message(payload: Any) -> str:
+    """Return only the top-level API message, capped for safe display."""
+    if not isinstance(payload, dict):
+        return ""
+    value = payload.get("message")
+    if value is None:
+        value = payload.get("msg")
+    if not isinstance(value, (str, int, float, bool)):
+        return ""
+    return str(value)[:500]
 
 
 def _component_rows(payload: Any) -> list[dict]:

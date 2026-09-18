@@ -1,9 +1,14 @@
 import base64
 import hashlib
 import hmac
+import sys
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from inventree_diptrace_bom.jlcpcb import (
+    JlcClient,
+    JlcCredentials,
     _component_rows,
     availability_summary,
     compact_json,
@@ -13,7 +18,42 @@ from inventree_diptrace_bom.jlcpcb import (
 )
 
 
+class FakeResponse:
+    status_code = 200
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "J-Trace-ID": "trace-support-123",
+    }
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {"code": 200, "message": "success", "data": None}
+
+
+class FakeSession:
+    def post(self, *args, **kwargs):
+        return FakeResponse()
+
+
 class JlcTests(unittest.TestCase):
+    def test_private_diagnostic_includes_support_trace_without_credentials(self):
+        client = JlcClient(
+            JlcCredentials("app-123", "access-secret", "signing-secret"),
+            session=FakeSession(),
+        )
+        with patch.dict(sys.modules, {"requests": SimpleNamespace(RequestException=Exception)}):
+            result = client.diagnose_private_library("C9900053998")
+        page = result["response_pages"][0]
+        self.assertEqual(page["app_id"], "app-123")
+        self.assertEqual(page["interface"], client.PRIVATE_PATH)
+        self.assertEqual(page["j_trace_id"], "trace-support-123")
+        self.assertEqual(page["api_message"], "success")
+        self.assertRegex(page["call_time_utc"], r"^\d{4}-\d{2}-\d{2}T")
+        self.assertNotIn("access-secret", repr(result))
+        self.assertNotIn("signing-secret", repr(result))
+
     def test_signature_uses_documented_canonical_form(self):
         body = compact_json({"componentCodes": ["C77014"]})
         canonical = f"POST\n/example\n123\nabc\n{body}\n"

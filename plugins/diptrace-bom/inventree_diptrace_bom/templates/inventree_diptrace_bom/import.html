@@ -257,6 +257,9 @@
             return `${container.path} (${container.type}; ${detail})`;
           }).join(' | ') || 'none';
           return [
+            `Support trace: AppId ${page.app_id || 'unknown'}; interface POST ${page.interface || 'unknown'}`,
+            `Call time (UTC): ${page.call_time_utc || 'unknown'}; J-Trace-ID: ${page.j_trace_id || 'not returned'}`,
+            `API result: code ${page.api_code}; message ${page.api_message || '(empty)'}`,
             `Page ${page.requested_page}: HTTP ${page.http_status}; API code ${page.api_code}; content type ${page.content_type || 'unknown'}`,
             `Page ${page.requested_page} parser: ${page.extracted_rows} row(s), ${page.identified_components} identified component(s)`,
             `Page ${page.requested_page} pagination: ${pagination}`,
