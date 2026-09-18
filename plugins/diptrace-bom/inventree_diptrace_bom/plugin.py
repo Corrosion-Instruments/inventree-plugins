@@ -36,7 +36,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Normalize DipTrace BOMs and check InvenTree / JLCPCB availability"
-    VERSION = "0.1.5"
+    VERSION = "0.1.6"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 

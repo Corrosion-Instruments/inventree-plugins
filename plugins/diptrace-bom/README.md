@@ -17,6 +17,8 @@ the code was returned, how many library entries were scanned, the documented
 inventory buckets, and the returned field names. Stored API credentials and the
 unrestricted API response are never returned to the browser.
 
+Private-library requests use JLCPCB's enforced maximum page size of 100 records.
+
 The diagnostic also reports safe support metadata: call time, J-Trace-ID, AppId,
 interface, API message, HTTP/API status, container field names, list lengths,
 pagination values, and parser row counts.

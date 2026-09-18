@@ -33,15 +33,20 @@ class FakeResponse:
 
 
 class FakeSession:
+    def __init__(self):
+        self.last_kwargs = None
+
     def post(self, *args, **kwargs):
+        self.last_kwargs = kwargs
         return FakeResponse()
 
 
 class JlcTests(unittest.TestCase):
     def test_private_diagnostic_includes_support_trace_without_credentials(self):
+        session = FakeSession()
         client = JlcClient(
             JlcCredentials("app-123", "access-secret", "signing-secret"),
-            session=FakeSession(),
+            session=session,
         )
         with patch.dict(sys.modules, {"requests": SimpleNamespace(RequestException=Exception)}):
             result = client.diagnose_private_library("C9900053998")
@@ -50,6 +55,7 @@ class JlcTests(unittest.TestCase):
         self.assertEqual(page["interface"], client.PRIVATE_PATH)
         self.assertEqual(page["j_trace_id"], "trace-support-123")
         self.assertEqual(page["api_message"], "success")
+        self.assertIn('"pageSize":100', session.last_kwargs["data"].decode("utf-8"))
         self.assertRegex(page["call_time_utc"], r"^\d{4}-\d{2}-\d{2}T")
         self.assertNotIn("access-secret", repr(result))
         self.assertNotIn("signing-secret", repr(result))

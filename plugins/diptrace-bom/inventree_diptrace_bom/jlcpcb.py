@@ -89,7 +89,7 @@ class JlcClient:
                     result[code] = item
         return result
 
-    def private_library(self, page_size: int = 1000, max_pages: int = 100) -> dict[str, dict]:
+    def private_library(self, page_size: int = 100, max_pages: int = 100) -> dict[str, dict]:
         """Fetch the user's private JLC component library, indexed by C-code."""
         result: dict[str, dict] = {}
         for page in range(1, max_pages + 1):
@@ -110,7 +110,7 @@ class JlcClient:
         self,
         component_code: str,
         *,
-        page_size: int = 1000,
+        page_size: int = 100,
         max_pages: int = 100,
     ) -> dict:
         """Fetch private inventory with a credential-safe response-shape report."""
