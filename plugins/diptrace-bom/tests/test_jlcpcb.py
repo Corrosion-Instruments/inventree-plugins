@@ -9,6 +9,7 @@ from inventree_diptrace_bom.jlcpcb import (
     compact_json,
     make_signature,
     private_inventory_diagnostic,
+    response_shape_summary,
 )
 
 
@@ -70,6 +71,38 @@ class JlcTests(unittest.TestCase):
         self.assertFalse(result["found"])
         self.assertEqual(result["library_entries_scanned"], 1)
         self.assertEqual(result["returned_field_names"], [])
+
+    def test_response_shape_summary_reports_structure_without_values(self):
+        result = response_shape_summary(
+            {
+                "code": 200,
+                "accessKey": "do-not-return",
+                "data": {
+                    "currentPage": 1,
+                    "pageSize": 10,
+                    "totalCount": 73,
+                    "privateRows": [
+                        {
+                            "componentCode": "C9900053998",
+                            "consignedParts": 73,
+                            "secretToken": "do-not-return",
+                        }
+                    ],
+                },
+            }
+        )
+        root = next(item for item in result["response_containers"] if item["path"] == "$")
+        row_list = next(
+            item
+            for item in result["response_containers"]
+            if item["path"] == "$.data.privateRows"
+        )
+        self.assertEqual(root["field_names"], ["code", "data"])
+        self.assertEqual(root["redacted_field_count"], 1)
+        self.assertEqual(row_list["length"], 1)
+        self.assertEqual(row_list["item_field_names"], ["componentCode", "consignedParts"])
+        self.assertEqual(result["pagination"]["$.data.totalCount"], "73")
+        self.assertNotIn("do-not-return", repr(result))
 
 
 if __name__ == "__main__":

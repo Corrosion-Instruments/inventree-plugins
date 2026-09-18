@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -105,7 +106,58 @@ class JlcClient:
                 break
         return result
 
+    def diagnose_private_library(
+        self,
+        component_code: str,
+        *,
+        page_size: int = 1000,
+        max_pages: int = 100,
+    ) -> dict:
+        """Fetch private inventory with a credential-safe response-shape report."""
+        library: dict[str, dict] = {}
+        page_reports: list[dict] = []
+        for page in range(1, max_pages + 1):
+            payload, transport = self._post_with_transport(
+                self.PRIVATE_PATH,
+                {"currentPage": page, "pageSize": page_size},
+            )
+            rows = _component_rows(payload)
+            for item in rows:
+                code = str(item.get("componentCode") or item.get("component_code") or "").upper()
+                if code:
+                    library[code] = item
+
+            shape = response_shape_summary(payload)
+            page_reports.append(
+                {
+                    "requested_page": page,
+                    "requested_page_size": page_size,
+                    "http_status": transport["http_status"],
+                    "content_type": transport["content_type"],
+                    "api_code": _safe_api_code(payload),
+                    "extracted_rows": len(rows),
+                    "identified_components": sum(
+                        1
+                        for item in rows
+                        if item.get("componentCode") or item.get("component_code")
+                    ),
+                    **shape,
+                }
+            )
+            if len(rows) < page_size:
+                break
+
+        result = private_inventory_diagnostic(component_code, library)
+        result["pages_requested"] = len(page_reports)
+        result["response_pages"] = page_reports
+        return result
+
     def _post(self, path: str, payload: dict) -> dict:
+        data, _transport = self._post_with_transport(path, payload)
+        return data
+
+    def _post_with_transport(self, path: str, payload: dict) -> tuple[dict, dict]:
+        """POST to JLCPCB and return JSON plus non-sensitive transport metadata."""
         import requests
 
         body = compact_json(payload)
@@ -145,7 +197,10 @@ class JlcClient:
         if code not in (None, 0, "0", 200, "200"):
             message = data.get("message") or data.get("msg") or f"API code {code}"
             raise JlcApiError(f"JLCPCB API error: {message}")
-        return data
+        return data, {
+            "http_status": response.status_code,
+            "content_type": str(response.headers.get("Content-Type") or "").split(";", 1)[0],
+        }
 
 
 def availability_summary(public: dict | None, private: dict | None) -> dict:
@@ -200,6 +255,106 @@ def private_inventory_diagnostic(component_code: str, library: dict[str, dict]) 
             )
         }
     return diagnostic
+
+
+_SENSITIVE_FIELD_MARKERS = (
+    "accesskey",
+    "access_key",
+    "appid",
+    "app_id",
+    "authorization",
+    "credential",
+    "nonce",
+    "secret",
+    "signature",
+    "token",
+)
+
+_PAGINATION_FIELDS = {
+    "currentpage",
+    "page",
+    "pagecount",
+    "pagenum",
+    "pagenumber",
+    "pages",
+    "pagesize",
+    "recordcount",
+    "records",
+    "recordstotal",
+    "total",
+    "totalcount",
+    "totalpages",
+}
+
+
+def response_shape_summary(payload: Any, *, max_depth: int = 4, max_nodes: int = 40) -> dict:
+    """Describe a JSON response without returning any response values or credentials."""
+    containers: list[dict] = []
+    pagination: dict[str, str] = {}
+    queue: list[tuple[str, Any, int]] = [("$", payload, 0)]
+
+    while queue and len(containers) < max_nodes:
+        path, candidate, depth = queue.pop(0)
+        if isinstance(candidate, dict):
+            safe_keys = sorted(
+                str(key) for key in candidate if not _is_sensitive_field(str(key))
+            )
+            containers.append(
+                {
+                    "path": path,
+                    "type": "object",
+                    "field_names": safe_keys,
+                    "redacted_field_count": len(candidate) - len(safe_keys),
+                }
+            )
+            for key, value in candidate.items():
+                key_text = str(key)
+                if _is_sensitive_field(key_text):
+                    continue
+                normalized = re.sub(r"[^a-z0-9]", "", key_text.lower())
+                if normalized in _PAGINATION_FIELDS and _is_safe_scalar(value):
+                    pagination[f"{path}.{key_text}"] = str(value)
+                if depth < max_depth and isinstance(value, (dict, list)):
+                    queue.append((f"{path}.{key_text}", value, depth + 1))
+        elif isinstance(candidate, list):
+            report = {"path": path, "type": "list", "length": len(candidate)}
+            first_mapping = next((item for item in candidate if isinstance(item, dict)), None)
+            if first_mapping is not None:
+                report["item_field_names"] = sorted(
+                    str(key)
+                    for key in first_mapping
+                    if not _is_sensitive_field(str(key))
+                )
+                report["redacted_item_field_count"] = sum(
+                    1 for key in first_mapping if _is_sensitive_field(str(key))
+                )
+                if depth < max_depth:
+                    queue.append((f"{path}[0]", first_mapping, depth + 1))
+            containers.append(report)
+
+    return {
+        "response_containers": containers,
+        "pagination": pagination,
+        "shape_truncated": bool(queue),
+    }
+
+
+def _is_sensitive_field(name: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9_]", "", name.lower())
+    return any(marker in normalized for marker in _SENSITIVE_FIELD_MARKERS)
+
+
+def _is_safe_scalar(value: Any) -> bool:
+    return isinstance(value, (int, float)) or (
+        isinstance(value, str) and bool(re.fullmatch(r"-?\d+(?:\.\d+)?", value.strip()))
+    )
+
+
+def _safe_api_code(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return "not present"
+    value = payload.get("code")
+    return str(value) if _is_safe_scalar(value) else "not present"
 
 
 def _component_rows(payload: Any) -> list[dict]:

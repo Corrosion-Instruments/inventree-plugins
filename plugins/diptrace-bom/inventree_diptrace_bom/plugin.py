@@ -17,7 +17,7 @@ from plugin import InvenTreePlugin
 from plugin.mixins import NavigationMixin, SettingsMixin, UrlsMixin, UserInterfaceMixin
 
 from .parser import BomParseError, parse_bom
-from .jlcpcb import JlcApiError, JlcClient, private_inventory_diagnostic
+from .jlcpcb import JlcApiError, JlcClient
 from .services import BomImportError, BomImportService
 
 __all__ = []
@@ -36,7 +36,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Normalize DipTrace BOMs and check InvenTree / JLCPCB availability"
-    VERSION = "0.1.3"
+    VERSION = "0.1.4"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -214,8 +214,7 @@ class DipTraceBomPlugin(
         )
         try:
             # Intentionally bypass the normal five-minute cache so this is a fresh diagnostic.
-            library = client.private_library()
-            result = private_inventory_diagnostic(component_code, library)
+            result = client.diagnose_private_library(component_code)
             result["fresh_request"] = True
             return JsonResponse(result)
         except JlcApiError as exc:

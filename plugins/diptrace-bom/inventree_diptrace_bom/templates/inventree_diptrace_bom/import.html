@@ -248,16 +248,33 @@
         const result = await postJson('diagnose-private-inventory/', {component_code: componentCode});
         const inventory = result.inventory || {};
         const fields = (result.returned_field_names || []).join(', ') || 'none (C-code was not returned)';
+        const pages = result.response_pages || [];
+        const pageDetails = pages.flatMap(page => {
+          const pagination = Object.entries(page.pagination || {}).map(([name,value]) => `${name}=${value}`).join(', ') || 'none';
+          const containers = (page.response_containers || []).map(container => {
+            const fields = container.field_names || container.item_field_names || [];
+            const detail = container.type === 'list' ? `length=${container.length}` : `fields=${fields.join(', ') || 'none'}`;
+            return `${container.path} (${container.type}; ${detail})`;
+          }).join(' | ') || 'none';
+          return [
+            `Page ${page.requested_page}: HTTP ${page.http_status}; API code ${page.api_code}; content type ${page.content_type || 'unknown'}`,
+            `Page ${page.requested_page} parser: ${page.extracted_rows} row(s), ${page.identified_components} identified component(s)`,
+            `Page ${page.requested_page} pagination: ${pagination}`,
+            `Page ${page.requested_page} response shape: ${containers}${page.shape_truncated ? ' | …truncated' : ''}`,
+          ];
+        });
         el['diagnostic-result'].textContent = [
           `C-code: ${result.component_code}`,
           `Found in private API response: ${result.found ? 'YES' : 'NO'}`,
           `Private-library entries scanned: ${result.library_entries_scanned}`,
+          `Pages requested: ${result.pages_requested || 0}`,
           `JLCPCB Parts: ${inventory.jlcpcb_parts || '0'}`,
           `Global Sourcing: ${inventory.global_sourcing || '0'}`,
           `Consigned: ${inventory.consigned || '0'}`,
           `Idle Stock: ${inventory.idle_stock || '0'}`,
           `Private total: ${inventory.private_total || '0'}`,
           `Returned field names: ${fields}`,
+          ...pageDetails,
         ].join('\n');
         el['diagnostic-result'].className = `message ${result.found ? 'ok' : 'warn'}`;
       } catch (error) {

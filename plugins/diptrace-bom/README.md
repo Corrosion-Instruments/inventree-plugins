@@ -17,6 +17,10 @@ the code was returned, how many library entries were scanned, the documented
 inventory buckets, and the returned field names. Stored API credentials and the
 unrestricted API response are never returned to the browser.
 
+The diagnostic also reports safe response-shape metadata: HTTP/API status,
+container field names, list lengths, pagination values, and parser row counts.
+It never returns raw component values, authorization data, or stored secrets.
+
 The private JLCPCB inventory is displayed as external availability. It is **not** added to InvenTree physical stock.
 
 ## Installation
