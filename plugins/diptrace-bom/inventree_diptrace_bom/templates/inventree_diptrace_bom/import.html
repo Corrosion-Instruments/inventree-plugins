@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{{ title }}</title>
+  <style>
+    :root { color-scheme:light; --ink:#15202b; --muted:#667085; --line:#d8dee6; --surface:#fff;
+      --band:#f5f7fa; --action:#1769d2; --ok:#067647; --warn:#b54708; --danger:#b42318; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--band); }
+    header, main { width:min(1600px,calc(100% - 32px)); margin:0 auto; }
+    header { padding:22px 0 12px; }
+    nav { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:16px; }
+    nav div { display:flex; gap:14px; flex-wrap:wrap; }
+    a { color:var(--action); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    h1 { margin:0; font-size:28px; }
+    main { display:grid; gap:16px; padding-bottom:36px; }
+    section { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:16px; }
+    h2 { margin:0 0 14px; font-size:18px; }
+    .setup { display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.3fr); gap:18px; }
+    .field { display:grid; gap:6px; color:var(--muted); font-size:13px; }
+    .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+    input,select,button { min-height:40px; border-radius:6px; font:inherit; }
+    input,select { width:100%; border:1px solid var(--line); padding:8px 10px; background:#fff; color:var(--ink); }
+    button { border:1px solid var(--action); padding:8px 14px; background:var(--action); color:#fff; cursor:pointer; white-space:nowrap; }
+    button.secondary { background:#fff; color:var(--action); }
+    button.small { min-height:32px; padding:5px 9px; font-size:13px; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .actions { display:flex; align-items:end; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    .actions .field { min-width:180px; }
+    .checkbox { display:flex; align-items:center; gap:7px; color:var(--ink); font-size:14px; min-height:40px; }
+    .checkbox input { width:auto; min-height:auto; }
+    .message { display:none; border-radius:6px; padding:10px 12px; background:#eef4ff; color:#1849a9; }
+    .message.ok { background:#ecfdf3; color:var(--ok); }
+    .message.error { background:#fff1f0; color:var(--danger); }
+    .message.warn { background:#fff7ed; color:var(--warn); }
+    .summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .metric { border:1px solid var(--line); border-radius:6px; padding:10px; min-width:0; }
+    .metric span { display:block; color:var(--muted); font-size:12px; }
+    .metric strong { display:block; margin-top:3px; font-size:18px; overflow-wrap:anywhere; }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:6px; }
+    table { width:100%; min-width:1450px; border-collapse:collapse; font-size:13px; }
+    th,td { border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+    th:last-child,td:last-child { border-right:0; }
+    th { position:sticky; top:0; background:#f8fafc; color:var(--muted); font-weight:650; z-index:1; }
+    td select { min-width:260px; min-height:34px; padding:5px 7px; }
+    .part-cell { display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:6px; }
+    .status { display:inline-block; margin-top:5px; border-radius:999px; padding:2px 7px; font-size:11px; background:#f2f4f7; }
+    .status.matched { color:var(--ok); background:#ecfdf3; }
+    .status.unmatched,.status.ambiguous { color:var(--warn); background:#fff7ed; }
+    .zero { color:var(--danger); font-weight:650; }
+    .hidden { display:none !important; }
+    dialog { width:min(700px,calc(100% - 32px)); border:1px solid var(--line); border-radius:8px; padding:0; box-shadow:0 20px 45px #10182833; }
+    dialog::backdrop { background:#10182866; }
+    .dialog-body { padding:18px; display:grid; gap:12px; }
+    .search-results { max-height:360px; overflow:auto; display:grid; gap:7px; }
+    .result { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:9px; border:1px solid var(--line); border-radius:6px; }
+    .result small { color:var(--muted); display:block; margin-top:3px; }
+    @media(max-width:900px) { .setup,.summary { grid-template-columns:1fr; } header,main { width:min(100% - 20px,1600px); } }
+  </style>
+</head>
+<body data-initial-part="{{ initial_part }}">
+  <header>
+    <nav>
+      <a href="/web/"><strong>InvenTree</strong></a>
+      <div><a href="/web/part/">Parts</a><a href="/web/stock/">Stock</a><a href="/web/manufacturing/">Manufacturing</a><a href="/web/settings/plugins/">Plugin settings</a></div>
+    </nav>
+    <h1>DipTrace BOM</h1>
+  </header>
+  <main>
+    <div id="message" class="message"></div>
+    <section>
+      <h2>1. Select the product and BOM file</h2>
+      <div class="setup">
+        <div>
+          <label class="field">Assembly search
+            <div class="row"><input id="assembly-query" placeholder="Name or IPN"><button id="assembly-search" class="secondary" type="button">Search</button></div>
+          </label>
+          <label class="field" style="margin-top:10px">Assembly / finished product
+            <select id="assembly"><option value="">Select an assembly</option></select>
+          </label>
+        </div>
+        <label class="field">DipTrace BOM (.csv, .xlsx or .xlsm)
+          <input id="bom-file" type="file" accept=".csv,.txt,.xlsx,.xlsm">
+          <span>Expected fields: Designator, Footprint, Comment, Quantity and JLCPCB Part #.</span>
+        </label>
+      </div>
+      <div class="actions"><button id="preview" type="button">Preview and check stock</button></div>
+    </section>
+
+    <section id="review" class="hidden">
+      <h2>2. Review and resolve</h2>
+      <div class="summary">
+        <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
+        <div class="metric"><span>BOM lines</span><strong id="metric-lines">0</strong></div>
+        <div class="metric"><span>Matched</span><strong id="metric-matched">0</strong></div>
+        <div class="metric"><span>Unresolved</span><strong id="metric-unresolved">0</strong></div>
+        <div class="metric"><span>Can build locally</span><strong id="metric-can-build">0</strong></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>References</th><th>Value / comment</th><th>Footprint</th><th>Qty</th><th>JLC #</th>
+            <th>InvenTree part</th><th>Local available</th><th>Line can build</th>
+            <th>JLC public</th><th>My Parts total</th><th>Global sourcing</th><th>Consigned</th>
+          </tr></thead>
+          <tbody id="bom-rows"></tbody>
+        </table>
+      </div>
+      <div id="jlc-warning" class="message warn" style="margin-top:12px"></div>
+    </section>
+
+    <section id="final-section" class="hidden">
+      <h2>3. Finalize the InvenTree BOM</h2>
+      <p style="color:var(--muted);margin-top:0">Unresolved rows must be matched, or explicitly created if an administrator enabled that option.</p>
+      <div class="actions">
+        <label class="field">Import mode
+          <select id="mode"><option value="merge">Merge / update matching lines</option><option value="replace">Replace the entire existing BOM</option></select>
+        </label>
+        <label class="checkbox"><input id="validate" type="checkbox"> Mark imported BOM lines validated</label>
+        <label id="create-missing-wrap" class="checkbox hidden"><input id="create-missing" type="checkbox"> Create unresolved component parts</label>
+        <button id="finalize" type="button">Finalize BOM</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="part-dialog">
+    <div class="dialog-body">
+      <strong>Find an InvenTree part</strong>
+      <div class="row"><input id="part-query" placeholder="Name, IPN, JLC SKU or manufacturer MPN"><button id="part-search" type="button">Search</button></div>
+      <div id="part-results" class="search-results"></div>
+      <div><button id="part-close" class="secondary" type="button">Close</button></div>
+    </div>
+  </dialog>
+
+  <script>
+    const state = { preview: null, activeRow: null };
+    const el = Object.fromEntries([
+      'message','assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
+      'metric-matched','metric-unresolved','metric-can-build','bom-rows','jlc-warning','final-section','mode','validate',
+      'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close'
+    ].map(id => [id, document.getElementById(id)]));
+
+    function csrf() {
+      return document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1]
+        || document.querySelector('meta[name="csrf-token"]')?.content || '';
+    }
+    function message(text, kind='') {
+      el.message.textContent = text || '';
+      el.message.className = `message ${kind}`.trim();
+      el.message.style.display = text ? 'block' : 'none';
+      if (text) window.scrollTo({top:0, behavior:'smooth'});
+    }
+    async function getJson(url) {
+      const response = await fetch(url);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Request failed');
+      return body;
+    }
+    async function postJson(url, payload) {
+      const response = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf()}, body:JSON.stringify(payload)});
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Request failed');
+      return body;
+    }
+    function partText(part) {
+      return [part.label || part.name, part.ipn, part.category].filter(Boolean).join(' · ');
+    }
+    function addPartOption(select, part, selected=false) {
+      if (!part || Array.from(select.options).some(option => String(option.value) === String(part.pk))) return;
+      const option = document.createElement('option'); option.value = part.pk; option.textContent = partText(part); option.selected = selected; select.appendChild(option);
+    }
+    async function searchAssemblies() {
+      const result = await getJson(`parts/?assemblies=1&q=${encodeURIComponent(el['assembly-query'].value.trim())}`);
+      const current = el.assembly.value;
+      el.assembly.innerHTML = '<option value="">Select an assembly</option>';
+      for (const part of result.parts || []) addPartOption(el.assembly, part, String(part.pk) === current);
+      if (!(result.parts || []).length) message('No assembly parts found', 'warn'); else message('');
+    }
+    async function preview() {
+      if (!el.assembly.value) throw new Error('Select an assembly / finished product');
+      const file = el['bom-file'].files[0]; if (!file) throw new Error('Select a DipTrace BOM file');
+      const form = new FormData(); form.append('file', file); form.append('assembly_id', el.assembly.value);
+      el.preview.disabled = true; message('Parsing BOM and checking InvenTree and JLCPCB stock…');
+      try {
+        const response = await fetch('preview/', {method:'POST', headers:{'X-CSRFToken':csrf()}, body:form});
+        const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Preview failed');
+        state.preview = body; renderPreview(); message('Preview ready. Review every match before finalizing.', 'ok');
+      } finally { el.preview.disabled = false; }
+    }
+    function renderPreview() {
+      const data = state.preview; const summary = data.summary;
+      el['metric-file'].textContent = data.filename; el['metric-lines'].textContent = summary.line_count;
+      el['metric-matched'].textContent = summary.matched; el['metric-unresolved'].textContent = summary.unresolved;
+      el['metric-can-build'].textContent = summary.can_build; el['bom-rows'].innerHTML = '';
+      for (const row of data.rows) el['bom-rows'].appendChild(renderRow(row));
+      el.review.classList.remove('hidden'); el['final-section'].classList.remove('hidden');
+      el['create-missing-wrap'].classList.toggle('hidden', !data.settings.allow_create_missing);
+      el['create-missing'].checked = false;
+      el['jlc-warning'].textContent = data.jlc_error || '';
+      el['jlc-warning'].style.display = data.jlc_error ? 'block' : 'none';
+    }
+    function renderRow(row) {
+      const tr = document.createElement('tr'); tr.dataset.row = row.row;
+      for (const value of [row.designators,row.comment,row.footprint,row.quantity,row.jlcpcb_part]) {
+        const td = document.createElement('td'); td.textContent = value || '—'; tr.appendChild(td);
+      }
+      const partTd = document.createElement('td'); const wrap = document.createElement('div'); wrap.className = 'part-cell';
+      const select = document.createElement('select'); select.className = 'part-selection'; select.dataset.row = row.row;
+      const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Unresolved'; select.appendChild(blank);
+      addPartOption(select, row.match.part, true); for (const candidate of row.match.candidates || []) addPartOption(select, candidate, false);
+      const find = document.createElement('button'); find.type='button'; find.className='secondary small'; find.textContent='Find';
+      find.addEventListener('click', () => openPartDialog(row.row)); wrap.append(select,find); partTd.appendChild(wrap);
+      const badge = document.createElement('span'); badge.className=`status ${row.match.status}`; badge.textContent=row.match.reason; partTd.appendChild(badge); tr.appendChild(partTd);
+      for (const value of [row.local.available,row.local.can_build,row.jlc.public_stock,row.jlc.private_total,row.jlc.global_sourcing,row.jlc.consigned]) {
+        const td=document.createElement('td'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
+      }
+      return tr;
+    }
+    function openPartDialog(rowNumber) {
+      state.activeRow = rowNumber;
+      const row = state.preview.rows.find(item => item.row === rowNumber);
+      el['part-query'].value = row.jlcpcb_part || row.comment || '';
+      el['part-results'].innerHTML = '';
+      el['part-dialog'].showModal(); searchParts().catch(error => message(error.message,'error'));
+    }
+    async function searchParts() {
+      const query=el['part-query'].value.trim(); if (query.length < 2) throw new Error('Enter at least two search characters');
+      const result=await getJson(`parts/?q=${encodeURIComponent(query)}`); el['part-results'].innerHTML='';
+      for (const part of result.parts || []) {
+        const item=document.createElement('div'); item.className='result';
+        const copy=document.createElement('div'); const name=document.createElement('strong'); name.textContent=part.label;
+        const meta=document.createElement('small'); meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
+        const choose=document.createElement('button'); choose.type='button'; choose.className='small'; choose.textContent='Select';
+        choose.addEventListener('click',()=>choosePart(part)); item.append(copy,choose); el['part-results'].appendChild(item);
+      }
+      if (!(result.parts || []).length) el['part-results'].textContent='No parts found.';
+    }
+    function choosePart(part) {
+      const select=document.querySelector(`.part-selection[data-row="${state.activeRow}"]`); addPartOption(select,part,true); select.value=String(part.pk);
+      el['part-dialog'].close();
+    }
+    async function finalizeBom() {
+      if (!state.preview) return;
+      const selections={}; document.querySelectorAll('.part-selection').forEach(select => { if (select.value) selections[select.dataset.row]=select.value; });
+      const unresolved=state.preview.rows.filter(row => !selections[String(row.row)]);
+      if (unresolved.length && !el['create-missing'].checked) throw new Error(`${unresolved.length} BOM row(s) are unresolved`);
+      if (el.mode.value === 'replace' && !window.confirm('Replace the entire existing BOM? Existing BOM lines not in this upload will be deleted.')) return;
+      el.finalize.disabled=true; message('Finalizing BOM…');
+      try {
+        const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:el.assembly.value,selections,
+          mode:el.mode.value,validate:el.validate.checked,create_missing:el['create-missing'].checked});
+        message(`BOM finalized: ${result.created} created, ${result.updated} updated, ${result.deleted} removed. Can build locally: ${result.can_build}.`, 'ok');
+        const link=document.createElement('a'); link.href=result.bom_url; link.textContent=' Open the InvenTree BOM'; el.message.appendChild(link);
+      } finally { el.finalize.disabled=false; }
+    }
+    el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>message(error.message,'error')));
+    el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>message(error.message,'error'));}});
+    el.preview.addEventListener('click',()=>preview().catch(error=>message(error.message,'error')));
+    el['part-search'].addEventListener('click',()=>searchParts().catch(error=>message(error.message,'error')));
+    el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>message(error.message,'error'));}});
+    el['part-close'].addEventListener('click',()=>el['part-dialog'].close());
+    el.finalize.addEventListener('click',()=>finalizeBom().catch(error=>message(error.message,'error')));
+    (async()=>{
+      const initial=document.body.dataset.initialPart;
+      if(initial){el['assembly-query'].value=initial; await searchAssemblies(); if(Array.from(el.assembly.options).some(o=>o.value===initial)) el.assembly.value=initial;}
+      else await searchAssemblies();
+    })().catch(error=>message(error.message,'error'));
+  </script>
+</body>
+</html>

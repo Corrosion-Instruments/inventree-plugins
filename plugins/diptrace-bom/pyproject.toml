@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventree-diptrace-bom"
+version = "0.1.0"
+description = "DipTrace BOM import and JLCPCB availability checking for InvenTree"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Corrosion Instruments"}]
+dependencies = ["openpyxl>=3.1", "requests>=2.28"]
+
+[project.entry-points.inventree_plugins]
+DipTraceBomPlugin = "inventree_diptrace_bom.plugin:DipTraceBomPlugin"
+
+[tool.setuptools]
+packages = ["inventree_diptrace_bom"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+inventree_diptrace_bom = [
+    "static/*",
+    "templates/inventree_diptrace_bom/*",
+]
+

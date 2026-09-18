@@ -1,0 +1,3 @@
+recursive-include inventree_diptrace_bom/static *
+recursive-include inventree_diptrace_bom/templates *
+

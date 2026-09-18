@@ -1,0 +1,221 @@
+"""InvenTree plugin entry point for DipTrace BOM import."""
+
+from __future__ import annotations
+
+import json
+
+from django.core import signing
+from django.core.exceptions import ValidationError
+from django.http import HttpResponseForbidden, JsonResponse
+from django.middleware.csrf import get_token
+from django.shortcuts import render
+from django.urls import path
+from django.utils.translation import gettext_lazy as _
+
+from plugin import InvenTreePlugin
+from plugin.mixins import NavigationMixin, SettingsMixin, UrlsMixin, UserInterfaceMixin
+
+from .parser import BomParseError, parse_bom
+from .services import BomImportError, BomImportService
+
+__all__ = []
+
+
+class DipTraceBomPlugin(
+    SettingsMixin,
+    UrlsMixin,
+    NavigationMixin,
+    UserInterfaceMixin,
+    InvenTreePlugin,
+):
+    """Upload DipTrace BOMs, check stock, and finalize InvenTree BOMs."""
+
+    NAME = "DipTraceBomPlugin"
+    SLUG = "diptrace-bom"
+    TITLE = "DipTrace BOM"
+    DESCRIPTION = "Normalize DipTrace BOMs and check InvenTree / JLCPCB availability"
+    VERSION = "0.1.0"
+    AUTHOR = "Corrosion Instruments"
+    MIN_VERSION = "1.5.2"
+
+    NAVIGATION_TAB_NAME = "DipTrace BOM"
+    NAVIGATION_TAB_ICON = "fas fa-list-check"
+    NAVIGATION = [{"name": "DipTrace BOM", "link": "plugin:diptrace-bom:index"}]
+
+    SETTINGS = {
+        "JLC_APP_ID": {
+            "name": _("JLCPCB App ID"),
+            "description": _("App ID from the JLCPCB Open Platform application"),
+            "default": "",
+            "protected": True,
+        },
+        "JLC_ACCESS_KEY": {
+            "name": _("JLCPCB Access Key"),
+            "description": _("Access key from the JLCPCB Open Platform application"),
+            "default": "",
+            "protected": True,
+        },
+        "JLC_TOKENIZATION_KEY": {
+            "name": _("JLCPCB Tokenization Key"),
+            "description": _("HMAC tokenization / secret key used to sign JLCPCB API requests"),
+            "default": "",
+            "protected": True,
+        },
+        "JLC_HOST": {
+            "name": _("JLCPCB API Host"),
+            "description": _("Official JLCPCB Open API host"),
+            "default": "https://open.jlcpcb.com",
+        },
+        "JLC_TIMEOUT": {
+            "name": _("JLCPCB Request Timeout"),
+            "description": _("Maximum seconds to wait for a JLCPCB API response"),
+            "default": 30,
+            "validator": int,
+        },
+        "JLC_SUPPLIER": {
+            "name": _("JLC / LCSC Supplier"),
+            "description": _("Supplier company whose SKU is the DipTrace JLCPCB Part #"),
+            "model": "company.company",
+            "model_filters": {"is_supplier": True},
+        },
+        "ALLOW_CREATE_MISSING": {
+            "name": _("Allow Missing Part Creation"),
+            "description": _("Permit an importer to create unresolved component parts during finalization"),
+            "default": False,
+            "validator": bool,
+        },
+        "DEFAULT_COMPONENT_CATEGORY": {
+            "name": _("Default Component Category"),
+            "description": _("Category used when explicitly creating unresolved BOM components"),
+            "model": "part.partcategory",
+        },
+    }
+
+    def index(self, request):
+        if not request.user.is_authenticated:
+            return HttpResponseForbidden("Authentication required")
+        return render(
+            request,
+            "inventree_diptrace_bom/import.html",
+            {
+                "title": self.TITLE,
+                "csrf_token": get_token(request),
+                "initial_part": request.GET.get("part", ""),
+            },
+        )
+
+    def preview(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return JsonResponse({"error": "Select a BOM file"}, status=400)
+        if uploaded.size > 10 * 1024 * 1024:
+            return JsonResponse({"error": "The BOM file is larger than 10 MB"}, status=400)
+
+        try:
+            rows = [row.as_dict() for row in parse_bom(uploaded, uploaded.name)]
+            result = BomImportService(self).preview(rows, request.POST.get("assembly_id"))
+            result["preview_token"] = signing.dumps(
+                {"rows": rows, "filename": uploaded.name},
+                salt="inventree-diptrace-bom-preview",
+                compress=True,
+            )
+            result["filename"] = uploaded.name
+            return JsonResponse(result)
+        except (BomParseError, BomImportError) as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception as exc:
+            return JsonResponse({"error": f"Preview failed: {exc}"}, status=500)
+
+    def finalize(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+        try:
+            data = json_request(request)
+            preview = signing.loads(
+                data.get("preview_token", ""),
+                salt="inventree-diptrace-bom-preview",
+                max_age=3600,
+            )
+        except signing.SignatureExpired:
+            return JsonResponse({"error": "The preview expired; upload the BOM again"}, status=400)
+        except signing.BadSignature:
+            return JsonResponse({"error": "The preview token is invalid"}, status=400)
+        except BomImportError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        from company.models import SupplierPart
+        from part.models import BomItem, Part
+        from users.permissions import check_user_permission
+
+        mode = str(data.get("mode") or "merge")
+        required_permissions = [(BomItem, "add"), (BomItem, "change")]
+        if mode == "replace":
+            required_permissions.append((BomItem, "delete"))
+        if bool(data.get("create_missing", False)):
+            required_permissions.extend([(Part, "add"), (SupplierPart, "add")])
+        for model, action in required_permissions:
+            if not check_user_permission(request.user, model, action):
+                return JsonResponse({"error": f"Missing {action} permission for {model.__name__}"}, status=403)
+
+        try:
+            result = BomImportService(self).finalize(
+                preview["rows"],
+                assembly_id=int(data.get("assembly_id")),
+                selections=data.get("selections") or {},
+                mode=mode,
+                validate=bool(data.get("validate", False)),
+                create_missing=bool(data.get("create_missing", False)),
+                user=request.user,
+            )
+            return JsonResponse(result)
+        except (BomImportError, TypeError, ValueError, ValidationError) as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception as exc:
+            return JsonResponse({"error": f"Finalization failed: {exc}"}, status=500)
+
+    def parts(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+        service = BomImportService(self)
+        if request.GET.get("assemblies") in {"1", "true"}:
+            rows = service.search_assemblies(request.GET.get("q", ""))
+        else:
+            rows = service.search_parts(request.GET.get("q", ""))
+        return JsonResponse({"parts": rows})
+
+    def get_ui_dashboard_items(self, request, context, **kwargs):
+        return [
+            {
+                "key": "diptrace-bom-dashboard",
+                "title": _("DipTrace BOM"),
+                "description": _("Upload, resolve and check a PCB BOM"),
+                "icon": "ti:list-check",
+                "source": self.plugin_static_file("diptrace_bom_dashboard.js"),
+                "options": {"width": 3, "height": 2},
+                "context": {"url": f"/plugin/{self.SLUG}/"},
+            }
+        ]
+
+    def get_ui_navigation_items(self, request, context, **kwargs):
+        return []
+
+    def setup_urls(self):
+        return [
+            path("", self.index, name="index"),
+            path("preview/", self.preview, name="preview"),
+            path("finalize/", self.finalize, name="finalize"),
+            path("parts/", self.parts, name="parts"),
+        ]
+
+
+def json_request(request) -> dict:
+    if request.method != "POST":
+        raise BomImportError("POST required")
+    try:
+        return json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError as exc:
+        raise BomImportError("Invalid JSON request") from exc
