@@ -45,7 +45,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.2.0"
+    VERSION = "0.2.1"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -333,14 +333,29 @@ class DipTraceBomPlugin(
                 "title": _("DipTrace BOM"),
                 "description": _("Upload, resolve and check a PCB BOM"),
                 "icon": "ti:list-check",
-                "source": self.plugin_static_file("diptrace_bom_dashboard.js"),
+                "source": self.plugin_static_file(
+                    "diptrace_bom_dashboard.js:renderDashboardItem"
+                ),
                 "options": {"width": 3, "height": 2},
                 "context": {"url": f"/plugin/{self.SLUG}/"},
             }
         ]
 
     def get_ui_navigation_items(self, request, context, **kwargs):
-        return []
+        """Add a persistent importer link to the modern InvenTree navigation.
+
+        This is intentionally independent of the dashboard widget: users must
+        still be able to reach the importer when a browser cannot load a
+        plugin-provided dashboard script.
+        """
+        return [
+            {
+                "key": "diptrace-bom-navigation",
+                "title": _("DipTrace BOM"),
+                "icon": "ti:list-check",
+                "options": {"url": f"/plugin/{self.SLUG}/"},
+            }
+        ]
 
     def setup_urls(self):
         return [
