@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{{ title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme:light;
@@ -16,9 +19,9 @@
       --surface:#fff;
       --canvas:#f6f7f9;
       --band:#f9fafb;
-      --action:#155eef;
-      --action-hover:#004eeb;
-      --action-soft:#eff4ff;
+      --action:#171717;
+      --action-hover:#000;
+      --action-soft:#f2f2f2;
       --ok:#067647;
       --ok-soft:#ecfdf3;
       --warn:#b54708;
@@ -29,12 +32,12 @@
     }
     * { box-sizing:border-box; }
     html { background:var(--canvas); scroll-behavior:smooth; }
-    body { margin:0; min-width:320px; font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--canvas); }
+    body { margin:0; min-width:320px; font-family:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--canvas); }
     a { color:var(--action); text-decoration:none; }
     a:hover { color:var(--action-hover); text-decoration:underline; text-underline-offset:3px; }
-    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(21,94,239,.24); outline-offset:2px; }
-    button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(21,94,239,.12); }
-    button { min-height:40px; border:1px solid var(--action); border-radius:6px; padding:8px 14px; background:var(--action); color:#fff; font-weight:650; cursor:pointer; white-space:nowrap; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
+    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
+    button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
+    button { min-height:40px; border:1px solid var(--action); border-radius:6px; padding:8px 14px; background:var(--action); color:#fff; font-weight:600; cursor:pointer; white-space:nowrap; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
     button:hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); }
     button:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(16,24,40,.24); }
     button.secondary { border-color:var(--line); background:var(--surface); color:#344054; }
@@ -49,37 +52,41 @@
     .site-header { border-bottom:1px solid var(--line-soft); background:var(--surface); }
     .nav-shell,.page-shell { width:min(1520px,calc(100% - 40px)); margin:0 auto; }
     .nav-shell { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
-    .brand { display:inline-flex; align-items:center; gap:10px; color:#101828; font-size:16px; font-weight:750; }
+    .brand { display:inline-flex; align-items:center; gap:10px; color:#101828; font-size:16px; font-weight:700; }
     .brand:hover { color:var(--action); text-decoration:none; }
     .brand-mark { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action); color:#fff; font-size:13px; letter-spacing:-.04em; }
     .nav-links { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
-    .nav-links a { border-radius:6px; padding:8px 10px; color:#475467; font-size:14px; font-weight:550; }
+    .nav-links a { border-radius:6px; padding:8px 10px; color:#475467; font-size:14px; font-weight:500; }
     .nav-links a:hover { background:var(--band); color:var(--ink); text-decoration:none; }
     .page-shell { padding:28px 0 48px; }
     .page-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
-    .eyebrow { margin:0 0 6px; color:var(--action); font-size:13px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; }
     h1,h2,h3 { text-wrap:balance; }
     h1 { margin:0; font-size:clamp(26px,3vw,34px); line-height:1.18; letter-spacing:-.025em; }
     .page-description { max-width:720px; margin:8px 0 0; color:var(--muted); font-size:15px; line-height:1.55; text-wrap:pretty; }
     .workflow-note { flex:none; border:1px solid var(--line-soft); border-radius:6px; padding:8px 10px; background:var(--surface); color:#475467; font-size:13px; box-shadow:var(--shadow); }
     main { display:grid; gap:18px; }
-    section { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
+    section,.utility-panel { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
     .section-header { display:flex; align-items:flex-start; gap:12px; padding:18px 20px; border-bottom:1px solid var(--line-soft); }
     .section-heading-copy { min-width:0; }
     .section-heading-copy h2 { margin:0; font-size:18px; line-height:1.35; }
     .section-heading-copy p { margin:4px 0 0; color:var(--muted); font-size:14px; line-height:1.45; text-wrap:pretty; }
-    .step-index { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action-soft); color:var(--action); font-size:13px; font-weight:750; }
+    .step-index { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action-soft); color:var(--action); font-size:13px; font-weight:700; }
+    .utility-panel { overflow:hidden; }
+    .utility-summary { align-items:center; cursor:pointer; list-style:none; user-select:none; touch-action:manipulation; }
+    .utility-summary::-webkit-details-marker { display:none; }
+    .utility-summary::after { content:"Show"; flex:none; margin-left:auto; color:var(--muted); font-size:13px; font-weight:500; }
+    .utility-panel[open] .utility-summary::after { content:"Hide"; }
+    .utility-summary:hover { background:var(--band); }
+    .utility-summary:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:-3px; }
     .section-body { padding:20px; }
     .integration-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
-    .integration-action { min-width:0; padding:16px; }
+    .integration-action { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; }
     .integration-action + .integration-action { border-left:1px solid var(--line-soft); }
     .integration-action h3 { margin:0; font-size:15px; }
-    .integration-action p { min-height:40px; margin:5px 0 12px; color:var(--muted); font-size:13px; line-height:1.5; }
     .integration-control { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .inline-result { min-width:0; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
-    .credential-note { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.5; }
     .setup { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; }
-    .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:650; }
+    .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
     .field-stack { display:grid; gap:14px; }
     .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
@@ -130,6 +137,7 @@
       .workflow-note { display:inline-block; margin-top:14px; }
       .setup,.integration-grid,.summary { grid-template-columns:1fr; }
       .integration-action + .integration-action,.metric + .metric { border-left:0; border-top:1px solid var(--line-soft); }
+      .integration-action { align-items:flex-start; flex-direction:column; }
       .summary { display:grid; }
       .nav-shell { align-items:flex-start; padding:14px 0; }
       .nav-links { justify-content:flex-end; }
@@ -172,7 +180,6 @@
   <div class="page-shell">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Manufacturing Tools</p>
         <h1>DipTrace BOM Importer</h1>
         <p class="page-description">Match a DipTrace BOM to InvenTree parts, compare local and JLCPCB availability, then publish a reviewed BOM.</p>
       </div>
@@ -182,20 +189,16 @@
     <main id="main-content" tabindex="-1">
       <div id="message" class="message" role="status" aria-live="polite" tabindex="-1"></div>
 
-      <section aria-labelledby="connection-heading">
-        <div class="section-header">
-          <span class="step-index" aria-hidden="true">API</span>
+      <details class="utility-panel" aria-labelledby="connection-heading">
+        <summary class="section-header utility-summary">
           <div class="section-heading-copy">
             <h2 id="connection-heading">JLCPCB API Connection</h2>
-            <p>Check credentials or refresh plugin-managed external stock before importing a BOM.</p>
           </div>
-        </div>
+        </summary>
         <div class="section-body">
-          <p class="credential-note">Stored credentials are protected by InvenTree and appear as <strong>***</strong>. Saved values cannot be revealed in the browser.</p>
           <div class="integration-grid">
             <div class="integration-action">
               <h3>Connection Test</h3>
-              <p>Verify access to the public component catalogue and private inventory.</p>
               <div class="integration-control">
                 <button id="test-connection" class="secondary" type="button">Test Connection</button>
                 <span id="connection-result" class="inline-result" role="status" aria-live="polite"></span>
@@ -203,7 +206,6 @@
             </div>
             <div class="integration-action">
               <h3>External Stock Sync</h3>
-              <p>Update exact, existing JLC supplier-SKU matches. Local stock and catalogue parts remain unchanged.</p>
               <div class="integration-control">
                 <button id="sync-stock" class="secondary" type="button">Sync External Stock</button>
                 <span id="sync-result" class="inline-result" role="status" aria-live="polite"></span>
@@ -211,7 +213,7 @@
             </div>
           </div>
         </div>
-      </section>
+      </details>
 
       <section aria-labelledby="select-heading">
         <div class="section-header">
