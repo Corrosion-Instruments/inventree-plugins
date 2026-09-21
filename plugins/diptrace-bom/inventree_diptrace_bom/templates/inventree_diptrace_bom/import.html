@@ -87,6 +87,23 @@
     .input-with-icon { position:relative; min-width:0; }
     .input-with-icon > .icon { position:absolute; top:50%; left:11px; z-index:1; color:var(--muted); pointer-events:none; transform:translateY(-50%); }
     .input-with-icon > input { padding-left:35px; }
+    .combobox { position:relative; min-width:0; }
+    .combobox-control { min-height:36px; display:grid; grid-template-columns:minmax(0,1fr) 35px; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:var(--shadow); }
+    .combobox-control:hover { border-color:#98a2b3; }
+    .combobox-control:focus-within { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
+    .combobox-control .input-with-icon > input { min-height:34px; border:0; border-radius:6px 0 0 6px; box-shadow:none; }
+    .combobox-control .input-with-icon > input:focus-visible { outline:0; }
+    button.combobox-toggle { width:34px; min-height:34px; border:0; border-left:1px solid var(--line-soft); border-radius:0 5px 5px 0; padding:0; background:var(--surface); color:var(--muted); }
+    button.combobox-toggle:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
+    .combobox-options { position:absolute; top:calc(100% + 6px); right:0; left:0; z-index:30; max-height:280px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:0 12px 28px rgba(16,24,40,.14); overscroll-behavior:contain; }
+    button.combobox-option { width:100%; min-height:48px; display:block; border:0; border-bottom:1px solid var(--line-soft); border-radius:0; padding:9px 11px; background:var(--surface); color:var(--ink); text-align:left; white-space:normal; }
+    button.combobox-option:last-child { border-bottom:0; }
+    button.combobox-option:hover:not(:disabled),button.combobox-option.active { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
+    button.combobox-option[aria-selected="true"] { background:var(--action-soft); }
+    .combobox-option strong,.combobox-option small { display:block; overflow-wrap:anywhere; }
+    .combobox-option small { margin-top:3px; color:var(--muted); font-weight:400; line-height:1.35; }
+    .combobox-empty { padding:12px; color:var(--muted); font-size:13px; line-height:1.45; }
+    .combobox-status { min-height:18px; color:var(--muted); font-size:12px; font-weight:400; line-height:1.45; }
     .file-control { min-width:0; min-height:36px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; overflow:hidden; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:var(--shadow); }
     .file-control:hover { border-color:#98a2b3; }
     .file-control:focus-within { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
@@ -219,20 +236,22 @@
       <section aria-label="BOM setup">
         <div class="section-body">
           <div class="setup-layout">
-            <div class="field">
-              <label for="assembly-query">Assembly Search</label>
-              <div class="row">
-                <div class="input-with-icon">
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-                  <input id="assembly-query" name="assembly_query" type="search" placeholder="Search by name or IPN…" autocomplete="off" spellcheck="false">
-                </div>
-                <button id="assembly-search" class="secondary" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>Search Assemblies</button>
-              </div>
-            </div>
             <div class="setup-pair">
-              <label class="field" for="assembly">Assembly / Finished Product
-                <select id="assembly" name="assembly"><option value="">Select an assembly</option></select>
-              </label>
+              <div class="field">
+                <label for="assembly-query">Assembly / Finished Product</label>
+                <div class="combobox" id="assembly-combobox">
+                  <div class="combobox-control">
+                    <div class="input-with-icon">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+                      <input id="assembly-query" name="assembly_query" type="search" role="combobox" placeholder="Search assemblies by name or IPN…" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-expanded="false" aria-controls="assembly-options" aria-describedby="assembly-status">
+                    </div>
+                    <button id="assembly-toggle" class="combobox-toggle" type="button" aria-label="Show assembly options" aria-controls="assembly-options" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button>
+                  </div>
+                  <input id="assembly" name="assembly" type="hidden">
+                  <div id="assembly-options" class="combobox-options hidden" role="listbox" aria-label="Assemblies"></div>
+                </div>
+                <span id="assembly-status" class="combobox-status" aria-live="polite">Loading assemblies…</span>
+              </div>
               <div class="field">
                 <label for="bom-file">DipTrace BOM File</label>
                 <div class="file-control">
@@ -345,9 +364,9 @@
   </dialog>
 
   <script>
-    const state = { preview: null, activeRow: null };
+    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '' };
     const el = Object.fromEntries([
-      'assembly-query','assembly-search','assembly','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
+      'assembly-query','assembly-toggle','assembly','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
@@ -518,22 +537,90 @@
       if (!part || Array.from(select.options).some(option => String(option.value) === String(part.pk))) return;
       const option = document.createElement('option'); option.value = part.pk; option.textContent = partText(part); option.selected = selected; select.appendChild(option);
     }
-    async function searchAssemblies(showProgress=true) {
-      const button = el['assembly-search'];
-      button.disabled = true;
-      button.setAttribute('aria-busy', 'true');
-      if (showProgress) showLoading('Searching Assemblies…', 'Looking for matching assembly parts in InvenTree.');
-      try {
-        const result = await getJson(`parts/?assemblies=1&q=${encodeURIComponent(el['assembly-query'].value.trim())}`);
-        const current = el.assembly.value;
-        el.assembly.innerHTML = '<option value="">Select an assembly</option>';
-        for (const part of result.parts || []) addPartOption(el.assembly, part, String(part.pk) === current);
-        if (!(result.parts || []).length) notify('No assembly parts found. Try a different name or IPN.', 'warning', 'No Assemblies Found');
-      } finally {
-        if (showProgress) hideLoading();
-        button.disabled = false;
-        button.removeAttribute('aria-busy');
+    function setAssemblyOptionsOpen(open) {
+      const shouldOpen = Boolean(open);
+      el['assembly-options'].classList.toggle('hidden', !shouldOpen);
+      el['assembly-query'].setAttribute('aria-expanded', String(shouldOpen));
+      el['assembly-toggle'].setAttribute('aria-expanded', String(shouldOpen));
+      el['assembly-toggle'].setAttribute('aria-label', shouldOpen ? 'Hide assembly options' : 'Show assembly options');
+      if (!shouldOpen) {
+        state.assemblyActiveIndex = -1;
+        el['assembly-query'].removeAttribute('aria-activedescendant');
+        el['assembly-options'].querySelectorAll('.active').forEach(option => option.classList.remove('active'));
       }
+    }
+    function selectAssembly(part) {
+      if (!part) return;
+      const text = partText(part);
+      el.assembly.value = String(part.pk);
+      el['assembly-query'].value = text;
+      state.selectedAssemblyText = text;
+      el['assembly-status'].textContent = `${part.label || part.name || 'Assembly'} selected.`;
+      for (const option of el['assembly-options'].querySelectorAll('.combobox-option')) {
+        option.setAttribute('aria-selected', String(option.dataset.pk === String(part.pk)));
+      }
+      el['assembly-query'].focus({preventScroll:true});
+      setAssemblyOptionsOpen(false);
+    }
+    function setActiveAssembly(index) {
+      const options = Array.from(el['assembly-options'].querySelectorAll('.combobox-option'));
+      if (!options.length) return;
+      state.assemblyActiveIndex = Math.max(0, Math.min(index, options.length - 1));
+      options.forEach((option, optionIndex) => option.classList.toggle('active', optionIndex === state.assemblyActiveIndex));
+      const active = options[state.assemblyActiveIndex];
+      el['assembly-query'].setAttribute('aria-activedescendant', active.id);
+      active.scrollIntoView({block:'nearest'});
+    }
+    function renderAssemblyOptions(parts) {
+      state.assemblyResults = parts;
+      state.assemblyActiveIndex = -1;
+      el['assembly-query'].removeAttribute('aria-activedescendant');
+      el['assembly-options'].replaceChildren();
+      if (!parts.length) {
+        const empty = document.createElement('div');
+        empty.className = 'combobox-empty';
+        empty.textContent = 'No assemblies found. Try another name or IPN.';
+        el['assembly-options'].appendChild(empty);
+        return;
+      }
+      for (const [index, part] of parts.entries()) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'combobox-option';
+        option.id = `assembly-option-${index}`;
+        option.dataset.index = String(index);
+        option.dataset.pk = String(part.pk);
+        option.tabIndex = -1;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(String(part.pk) === el.assembly.value));
+        const name = document.createElement('strong');
+        name.textContent = part.label || part.name || `Assembly ${part.pk}`;
+        const detail = document.createElement('small');
+        detail.textContent = [part.ipn, part.category].filter(Boolean).join(' · ') || 'Assembly part';
+        option.append(name, detail);
+        option.addEventListener('click', () => selectAssembly(part));
+        option.addEventListener('mouseenter', () => setActiveAssembly(index));
+        el['assembly-options'].appendChild(option);
+      }
+    }
+    async function searchAssemblies(openResults=true) {
+      const requestedQuery = el['assembly-query'].value.trim();
+      el['assembly-query'].setAttribute('aria-busy', 'true');
+      el['assembly-status'].textContent = 'Searching assemblies…';
+      try {
+        const result = await getJson(`parts/?assemblies=1&q=${encodeURIComponent(requestedQuery)}`);
+        if (el['assembly-query'].value.trim() !== requestedQuery) return;
+        const parts = result.parts || [];
+        renderAssemblyOptions(parts);
+        el['assembly-status'].textContent = parts.length === 1 ? '1 assembly found.' : `${parts.length} assemblies found.`;
+        if (openResults) setAssemblyOptionsOpen(true);
+      } finally {
+        el['assembly-query'].removeAttribute('aria-busy');
+      }
+    }
+    function queueAssemblySearch() {
+      window.clearTimeout(state.assemblySearchTimer);
+      state.assemblySearchTimer = window.setTimeout(() => searchAssemblies(true).catch(error => showError(error, 'Assembly Search Failed')), 250);
     }
     async function preview() {
       if (!el.assembly.value) throw new Error('Select an assembly / finished product');
@@ -677,8 +764,45 @@
     }
     el['loading-dialog'].addEventListener('cancel', event => event.preventDefault());
     el['bom-file'].addEventListener('change', updateSelectedFileName);
-    el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>showError(error, 'Assembly Search Failed')));
-    el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>showError(error, 'Assembly Search Failed'));}});
+    el['assembly-query'].addEventListener('input', () => {
+      if (el['assembly-query'].value !== state.selectedAssemblyText) {
+        el.assembly.value = '';
+        state.selectedAssemblyText = '';
+      }
+      queueAssemblySearch();
+    });
+    el['assembly-query'].addEventListener('focus', () => {
+      if (state.assemblyResults.length) setAssemblyOptionsOpen(true);
+    });
+    el['assembly-query'].addEventListener('keydown', event => {
+      const options = state.assemblyResults;
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setAssemblyOptionsOpen(true);
+        setActiveAssembly(state.assemblyActiveIndex + 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setAssemblyOptionsOpen(true);
+        setActiveAssembly(state.assemblyActiveIndex < 0 ? options.length - 1 : state.assemblyActiveIndex - 1);
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        if (!el['assembly-options'].classList.contains('hidden') && state.assemblyActiveIndex >= 0) selectAssembly(options[state.assemblyActiveIndex]);
+        else if (options.length === 1) selectAssembly(options[0]);
+        else searchAssemblies(true).catch(error => showError(error, 'Assembly Search Failed'));
+      } else if (event.key === 'Escape') {
+        setAssemblyOptionsOpen(false);
+      }
+    });
+    el['assembly-toggle'].addEventListener('click', () => {
+      const isOpen = !el['assembly-options'].classList.contains('hidden');
+      if (isOpen) setAssemblyOptionsOpen(false);
+      else if (state.assemblyResults.length) setAssemblyOptionsOpen(true);
+      else searchAssemblies(true).catch(error => showError(error, 'Assembly Search Failed'));
+      el['assembly-query'].focus({preventScroll:true});
+    });
+    document.addEventListener('click', event => {
+      if (!document.getElementById('assembly-combobox').contains(event.target)) setAssemblyOptionsOpen(false);
+    });
     el.preview.addEventListener('click',()=>preview().catch(error=>showError(error, 'BOM Preview Failed')));
     el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>showError(error, 'Connection Test Failed')));
     el['sync-stock'].addEventListener('click',()=>syncStock().catch(error=>showError(error, 'Stock Sync Failed')));
@@ -693,8 +817,8 @@
     });
     (async()=>{
       const initial=document.body.dataset.initialPart;
-      if(initial){el['assembly-query'].value=initial; await searchAssemblies(false); if(Array.from(el.assembly.options).some(o=>o.value===initial)) el.assembly.value=initial;}
-      else await searchAssemblies(false);
+      await searchAssemblies(false);
+      if(initial){const selected=state.assemblyResults.find(part=>String(part.pk)===String(initial)); if(selected) selectAssembly(selected);}
       await restoreDashboardUpload();
     })().catch(error=>showError(error, 'Page Setup Failed'));
   </script>
