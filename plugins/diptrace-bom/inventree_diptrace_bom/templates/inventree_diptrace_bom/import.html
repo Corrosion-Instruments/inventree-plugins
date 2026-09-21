@@ -37,7 +37,7 @@
     a:hover { color:var(--action-hover); text-decoration:underline; text-underline-offset:3px; }
     a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
     button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
-    button,.workflow-note { min-height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:0 12px; font-family:inherit; font-size:13px; font-weight:500; line-height:1; white-space:nowrap; }
+    button,.workflow-note { min-height:36px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:6px; padding:0 12px; font-family:inherit; font-size:13px; font-weight:500; line-height:1; white-space:nowrap; }
     button { border:1px solid var(--action); background:var(--action); color:#fff; cursor:pointer; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
     button:hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); }
     button:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(16,24,40,.24); }
@@ -49,12 +49,10 @@
     button.icon-button { width:36px; min-height:36px; display:grid; place-items:center; border-color:transparent; padding:0; background:transparent; color:var(--muted); font-size:20px; line-height:1; }
     button.icon-button:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
     button:disabled { opacity:.55; cursor:not-allowed; }
-    input,select { min-height:42px; width:100%; border:1px solid var(--line); border-radius:6px; padding:8px 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    input,select { min-height:36px; width:100%; border:1px solid var(--line); border-radius:6px; padding:0 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
     input:hover,select:hover { border-color:#98a2b3; }
     input::placeholder { color:var(--subtle); }
-    input[type="file"] { padding:2px 6px; }
-    input[type="file"]::file-selector-button { min-height:36px; margin-right:10px; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:var(--surface); color:#344054; font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; }
-    input[type="file"]::file-selector-button:hover { background:var(--band); }
+    .icon { flex:none; width:15px; height:15px; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; fill:none; }
     .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
     .skip-link:focus { transform:translateY(0); }
     .site-header { border-bottom:1px solid var(--line-soft); background:var(--surface); }
@@ -81,11 +79,20 @@
     .section-heading-copy p { margin:4px 0 0; color:var(--muted); font-size:14px; line-height:1.45; text-wrap:pretty; }
     .step-index { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action-soft); color:var(--action); font-size:13px; font-weight:700; }
     .section-body { padding:20px; }
-    .setup { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; }
+    .setup-layout { display:grid; gap:16px; }
+    .setup-pair { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; }
     .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
-    .field-stack { display:grid; gap:14px; }
     .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+    .input-with-icon { position:relative; min-width:0; }
+    .input-with-icon > .icon { position:absolute; top:50%; left:11px; z-index:1; color:var(--muted); pointer-events:none; transform:translateY(-50%); }
+    .input-with-icon > input { padding-left:35px; }
+    .file-control { min-width:0; min-height:36px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; overflow:hidden; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:var(--shadow); }
+    .file-control:hover { border-color:#98a2b3; }
+    .file-control:focus-within { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
+    .file-trigger { min-height:34px; display:inline-flex; align-items:center; gap:7px; border-right:1px solid var(--line); padding:0 12px; background:var(--band); color:#344054; font-size:13px; font-weight:500; cursor:pointer; }
+    .file-trigger:hover { background:var(--action-soft); color:var(--ink); }
+    .file-name { min-width:0; overflow:hidden; padding:0 11px; color:var(--muted); font-weight:400; text-overflow:ellipsis; white-space:nowrap; }
     .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
     .actions .field { min-width:220px; }
     .checkbox { min-height:40px; display:inline-flex; align-items:center; gap:9px; border-radius:6px; color:#344054; font-size:14px; cursor:pointer; }
@@ -148,7 +155,7 @@
       .nav-shell,.page-shell { width:min(100% - 24px,1520px); }
       .page-heading { display:block; }
       .page-actions { justify-content:flex-start; margin-top:14px; }
-      .setup,.summary { grid-template-columns:1fr; }
+      .setup-pair,.summary { grid-template-columns:1fr; }
       .metric + .metric { border-left:0; border-top:1px solid var(--line-soft); }
       .summary { display:grid; }
       .nav-shell { align-items:flex-start; padding:14px 0; }
@@ -202,41 +209,42 @@
         <p class="page-description">Match a DipTrace BOM to InvenTree parts, compare local and JLCPCB availability, then publish a reviewed BOM.</p>
       </div>
       <div class="page-actions" role="group" aria-label="Plugin actions">
-        <button id="test-connection" class="secondary" type="button">Test Connection</button>
-        <button id="sync-stock" class="secondary" type="button">Sync External Stock</button>
+        <button id="test-connection" class="secondary" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v7"></path><path d="M8.5 5.5a7 7 0 1 0 7 0"></path></svg>Test Connection</button>
+        <button id="sync-stock" class="secondary" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-5V2"></path><path d="M20 7a8 8 0 1 0 1.3 8"></path></svg>Sync External Stock</button>
         <span class="workflow-note" aria-label="Workflow length">3-step workflow</span>
       </div>
     </div>
 
     <main id="main-content" tabindex="-1">
-      <section aria-labelledby="select-heading">
-        <div class="section-header">
-          <span class="step-index" aria-hidden="true">1</span>
-          <div class="section-heading-copy">
-            <h2 id="select-heading">Select Product &amp; BOM File</h2>
-            <p>Choose the destination assembly and upload the exported DipTrace BOM.</p>
-          </div>
-        </div>
+      <section aria-label="BOM setup">
         <div class="section-body">
-          <div class="setup">
-            <div class="field-stack">
-              <div class="field">
-                <label for="assembly-query">Assembly Search</label>
-                <div class="row">
+          <div class="setup-layout">
+            <div class="field">
+              <label for="assembly-query">Assembly Search</label>
+              <div class="row">
+                <div class="input-with-icon">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
                   <input id="assembly-query" name="assembly_query" type="search" placeholder="Search by name or IPN…" autocomplete="off" spellcheck="false">
-                  <button id="assembly-search" class="secondary" type="button">Search Assemblies</button>
                 </div>
+                <button id="assembly-search" class="secondary" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>Search Assemblies</button>
               </div>
+            </div>
+            <div class="setup-pair">
               <label class="field" for="assembly">Assembly / Finished Product
                 <select id="assembly" name="assembly"><option value="">Select an assembly</option></select>
               </label>
+              <div class="field">
+                <label for="bom-file">DipTrace BOM File</label>
+                <div class="file-control">
+                  <input id="bom-file" class="visually-hidden" name="bom_file" type="file" accept=".csv,.txt,.xlsx,.xlsm" aria-describedby="bom-file-help bom-file-name">
+                  <label class="file-trigger" for="bom-file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Choose File</label>
+                  <span id="bom-file-name" class="file-name">No file selected</span>
+                </div>
+                <span id="bom-file-help" class="field-help">CSV, XLSX, or XLSM with Designator, Footprint, Comment, Quantity, and JLCPCB Part # fields.</span>
+              </div>
             </div>
-            <label class="field" for="bom-file">DipTrace BOM File
-              <input id="bom-file" name="bom_file" type="file" accept=".csv,.txt,.xlsx,.xlsm">
-              <span class="field-help">CSV, XLSX, or XLSM with Designator, Footprint, Comment, Quantity, and JLCPCB Part # fields.</span>
-            </label>
           </div>
-          <div class="actions"><button id="preview" type="button">Preview BOM &amp; Check Stock</button></div>
+          <div class="actions"><button id="preview" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m14 7 5 5-5 5"></path></svg>Preview BOM &amp; Check Stock</button></div>
         </div>
       </section>
 
@@ -339,7 +347,7 @@
   <script>
     const state = { preview: null, activeRow: null };
     const el = Object.fromEntries([
-      'assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
+      'assembly-query','assembly-search','assembly','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
@@ -495,7 +503,13 @@
       const transfer = new DataTransfer();
       transfer.items.add(file);
       el['bom-file'].files = transfer.files;
+      updateSelectedFileName();
       notify(`${file.name} is ready. Select the assembly, then preview the BOM.`, 'success', 'BOM File Ready');
+    }
+    function updateSelectedFileName() {
+      const file = el['bom-file'].files[0];
+      el['bom-file-name'].textContent = file?.name || 'No file selected';
+      el['bom-file-name'].title = file?.name || '';
     }
     function partText(part) {
       return [part.label || part.name, part.ipn, part.category].filter(Boolean).join(' · ');
@@ -662,6 +676,7 @@
       }
     }
     el['loading-dialog'].addEventListener('cancel', event => event.preventDefault());
+    el['bom-file'].addEventListener('change', updateSelectedFileName);
     el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>showError(error, 'Assembly Search Failed')));
     el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>showError(error, 'Assembly Search Failed'));}});
     el.preview.addEventListener('click',()=>preview().catch(error=>showError(error, 'BOM Preview Failed')));
