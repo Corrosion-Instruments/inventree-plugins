@@ -42,11 +42,18 @@
     button:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(16,24,40,.24); }
     button.secondary { border-color:var(--line); background:var(--surface); color:#344054; }
     button.secondary:hover:not(:disabled) { border-color:#98a2b3; background:var(--band); color:var(--ink); }
+    button.danger { border-color:var(--danger); background:var(--danger); color:#fff; }
+    button.danger:hover:not(:disabled) { border-color:#912018; background:#912018; }
     button.small { min-height:34px; padding:5px 10px; font-size:13px; }
+    button.icon-button { width:32px; min-height:32px; display:grid; place-items:center; border-color:transparent; padding:0; background:transparent; color:var(--muted); font-size:20px; line-height:1; }
+    button.icon-button:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
     button:disabled { opacity:.55; cursor:not-allowed; }
     input,select { min-height:42px; width:100%; border:1px solid var(--line); border-radius:6px; padding:8px 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
     input:hover,select:hover { border-color:#98a2b3; }
     input::placeholder { color:var(--subtle); }
+    input[type="file"] { padding:6px; }
+    input[type="file"]::file-selector-button { min-height:30px; margin-right:10px; border:1px solid var(--line); border-radius:5px; padding:5px 10px; background:var(--surface); color:#344054; font:inherit; font-weight:600; cursor:pointer; }
+    input[type="file"]::file-selector-button:hover { background:var(--band); }
     .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
     .skip-link:focus { transform:translateY(0); }
     .site-header { border-bottom:1px solid var(--line-soft); background:var(--surface); }
@@ -84,7 +91,6 @@
     .integration-action + .integration-action { border-left:1px solid var(--line-soft); }
     .integration-action h3 { margin:0; font-size:15px; }
     .integration-control { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-    .inline-result { min-width:0; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
     .setup { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; }
     .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
@@ -94,10 +100,19 @@
     .actions .field { min-width:220px; }
     .checkbox { min-height:40px; display:inline-flex; align-items:center; gap:9px; border-radius:6px; color:#344054; font-size:14px; cursor:pointer; }
     .checkbox input { width:16px; min-height:16px; height:16px; margin:0; box-shadow:none; }
-    .message { display:none; border:1px solid #b2ccff; border-radius:6px; padding:11px 13px; background:var(--action-soft); color:#1849a9; font-size:14px; line-height:1.5; }
-    .message.ok { border-color:#abefc6; background:var(--ok-soft); color:var(--ok); }
-    .message.error { border-color:#fecdca; background:var(--danger-soft); color:var(--danger); }
-    .message.warn { border-color:#fedf89; background:var(--warn-soft); color:var(--warn); }
+    .toast-region { position:fixed; top:max(16px,env(safe-area-inset-top)); right:max(16px,env(safe-area-inset-right)); z-index:120; width:min(420px,calc(100% - 32px)); display:grid; gap:10px; pointer-events:none; }
+    .toast { min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:10px; border:1px solid var(--line-soft); border-radius:8px; padding:12px; background:var(--surface); box-shadow:0 12px 32px rgba(16,24,40,.16); pointer-events:auto; transform-origin:top right; animation:toast-in .18s ease-out; }
+    .toast.leaving { animation:toast-out .15s ease-in forwards; }
+    .toast-mark { width:22px; height:22px; display:grid; place-items:center; border-radius:50%; background:var(--action-soft); color:var(--ink); font-size:12px; font-weight:700; }
+    .toast.success .toast-mark { background:var(--ok-soft); color:var(--ok); }
+    .toast.warning .toast-mark { background:var(--warn-soft); color:var(--warn); }
+    .toast.error .toast-mark { background:var(--danger-soft); color:var(--danger); }
+    .toast-copy { min-width:0; }
+    .toast-copy strong { display:block; font-size:14px; line-height:1.35; }
+    .toast-copy p { margin:3px 0 0; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
+    .toast-action { display:inline-block; margin-top:8px; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+    @keyframes toast-in { from { opacity:0; transform:translateY(-8px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(.98); } }
     .summary { display:grid; grid-template-columns:1.4fr repeat(4,1fr); margin-bottom:16px; border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
     .metric { min-width:0; padding:13px 14px; background:var(--band); }
     .metric + .metric { border-left:1px solid var(--line-soft); }
@@ -109,6 +124,7 @@
     th:last-child,td:last-child { border-right:0; }
     tbody tr:last-child td { border-bottom:0; }
     tbody tr:hover td { background:#fcfcfd; }
+    tbody tr { content-visibility:auto; contain-intrinsic-size:48px; }
     th { position:sticky; top:0; z-index:2; background:#f2f4f7; color:#475467; font-size:12px; font-weight:700; letter-spacing:.01em; }
     td select { min-width:260px; min-height:36px; padding:5px 8px; }
     td.numeric,th.numeric { text-align:right; font-variant-numeric:tabular-nums; }
@@ -131,6 +147,13 @@
     .result strong,.result small { overflow-wrap:anywhere; }
     .result small { display:block; margin-top:3px; color:var(--muted); line-height:1.4; }
     .dialog-actions { display:flex; justify-content:flex-end; }
+    .dialog-actions.split { justify-content:space-between; gap:10px; }
+    .loading-dialog { width:min(390px,calc(100% - 32px)); }
+    .loading-layout { display:flex; align-items:center; gap:14px; padding:22px; }
+    .spinner { flex:none; width:24px; height:24px; border:2px solid var(--line-soft); border-top-color:var(--ink); border-radius:50%; animation:spin .75s linear infinite; }
+    .loading-copy h2 { margin:0; font-size:17px; }
+    .loading-copy p { margin:4px 0 0; color:var(--muted); font-size:13px; line-height:1.45; }
+    @keyframes spin { to { transform:rotate(360deg); } }
     @media(max-width:900px) {
       .nav-shell,.page-shell { width:min(100% - 24px,1520px); }
       .page-heading { display:block; }
@@ -153,6 +176,9 @@
       .actions { align-items:stretch; }
       .actions .field { width:100%; min-width:0; }
       .checkbox { width:100%; }
+      .toast-region { left:12px; right:12px; width:auto; }
+      .dialog-actions.split { flex-direction:column-reverse; }
+      .dialog-actions.split button { width:100%; }
     }
     @media(prefers-reduced-motion:reduce) {
       html { scroll-behavior:auto; }
@@ -187,7 +213,6 @@
     </div>
 
     <main id="main-content" tabindex="-1">
-      <div id="message" class="message" role="status" aria-live="polite" tabindex="-1"></div>
 
       <details class="utility-panel" aria-labelledby="connection-heading">
         <summary class="section-header utility-summary">
@@ -201,14 +226,12 @@
               <h3>Connection Test</h3>
               <div class="integration-control">
                 <button id="test-connection" class="secondary" type="button">Test Connection</button>
-                <span id="connection-result" class="inline-result" role="status" aria-live="polite"></span>
               </div>
             </div>
             <div class="integration-action">
               <h3>External Stock Sync</h3>
               <div class="integration-control">
                 <button id="sync-stock" class="secondary" type="button">Sync External Stock</button>
-                <span id="sync-result" class="inline-result" role="status" aria-live="polite"></span>
               </div>
             </div>
           </div>
@@ -273,7 +296,6 @@
               <tbody id="bom-rows"></tbody>
             </table>
           </div>
-          <div id="jlc-warning" class="message warn" role="status" aria-live="polite"></div>
         </div>
       </section>
 
@@ -299,6 +321,33 @@
     </main>
   </div>
 
+  <div id="toast-region" class="toast-region" role="region" aria-label="Notifications" aria-live="polite" aria-relevant="additions"></div>
+
+  <dialog id="loading-dialog" class="loading-dialog" aria-labelledby="loading-title" aria-describedby="loading-message" tabindex="-1">
+    <div class="loading-layout">
+      <span class="spinner" aria-hidden="true"></span>
+      <div class="loading-copy">
+        <h2 id="loading-title">Working…</h2>
+        <p id="loading-message">Please wait while the request completes.</p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+    <div class="dialog-body">
+      <div class="dialog-header">
+        <div>
+          <h2 id="confirm-title">Replace Existing BOM?</h2>
+          <p id="confirm-message">Existing BOM lines that are not present in this upload will be deleted.</p>
+        </div>
+      </div>
+      <div class="dialog-actions split">
+        <button id="confirm-cancel" class="secondary" type="button">Cancel</button>
+        <button id="confirm-accept" class="danger" type="button">Replace BOM</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="part-dialog" aria-labelledby="part-dialog-title">
     <div class="dialog-body">
       <div class="dialog-header">
@@ -319,24 +368,97 @@
   <script>
     const state = { preview: null, activeRow: null };
     const el = Object.fromEntries([
-      'message','assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
-      'metric-matched','metric-unresolved','metric-can-build','bom-rows','jlc-warning','final-section','mode','validate',
+      'assembly-query','assembly-search','assembly','bom-file','preview','review','metric-file','metric-lines',
+      'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
-      'test-connection','connection-result','sync-stock','sync-result'
+      'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
+      'confirm-dialog','confirm-cancel','confirm-accept'
     ].map(id => [id, document.getElementById(id)]));
 
     function csrf() {
       return document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1]
         || document.querySelector('meta[name="csrf-token"]')?.content || '';
     }
-    function message(text, kind='') {
-      el.message.textContent = text || '';
-      el.message.className = `message ${kind}`.trim();
-      el.message.style.display = text ? 'block' : 'none';
-      if (text) {
-        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        window.scrollTo({top:0, behavior:reduceMotion ? 'auto' : 'smooth'});
+    function dismissToast(toast) {
+      if (!toast?.isConnected || toast.classList.contains('leaving')) return;
+      toast.classList.add('leaving');
+      window.setTimeout(() => toast.remove(), 180);
+    }
+    function notify(text, kind='info', title='', action=null) {
+      if (!text) return;
+      const titles = {info:'Notice',success:'Success',warning:'Needs Attention',error:'Action Failed'};
+      const marks = {info:'i',success:'✓',warning:'!',error:'×'};
+      const toast = document.createElement('div');
+      toast.className = `toast ${kind}`;
+      toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+
+      const mark = document.createElement('span');
+      mark.className = 'toast-mark';
+      mark.setAttribute('aria-hidden', 'true');
+      mark.textContent = marks[kind] || marks.info;
+
+      const copy = document.createElement('div');
+      copy.className = 'toast-copy';
+      const heading = document.createElement('strong');
+      heading.textContent = title || titles[kind] || titles.info;
+      const detail = document.createElement('p');
+      detail.textContent = text;
+      copy.append(heading, detail);
+      if (action?.href && action?.label) {
+        const link = document.createElement('a');
+        link.className = 'toast-action';
+        link.href = action.href;
+        link.textContent = action.label;
+        copy.appendChild(link);
       }
+
+      const close = document.createElement('button');
+      close.className = 'icon-button';
+      close.type = 'button';
+      close.setAttribute('aria-label', `Dismiss ${title || titles[kind] || titles.info} notification`);
+      close.textContent = '×';
+      close.addEventListener('click', () => dismissToast(toast));
+      toast.append(mark, copy, close);
+      el['toast-region'].prepend(toast);
+      while (el['toast-region'].children.length > 4) el['toast-region'].lastElementChild?.remove();
+      const timeout = kind === 'error' ? 12000 : kind === 'warning' ? 9000 : 6500;
+      window.setTimeout(() => dismissToast(toast), timeout);
+    }
+    function showError(error, title='Action Failed') {
+      const raw = error instanceof Error ? error.message : String(error || 'The request could not be completed.');
+      const hasNextStep = /select|choose|enter|try|restart|refresh|check|configure|enable|contact/i.test(raw);
+      notify(hasNextStep ? raw : `${raw} Check your settings and try again.`, 'error', title);
+    }
+    function showLoading(title, detail) {
+      el['loading-title'].textContent = title;
+      el['loading-message'].textContent = detail;
+      document.getElementById('main-content').setAttribute('aria-busy', 'true');
+      if (!el['loading-dialog'].open) el['loading-dialog'].showModal();
+      el['loading-dialog'].focus({preventScroll:true});
+    }
+    function hideLoading() {
+      document.getElementById('main-content').removeAttribute('aria-busy');
+      if (el['loading-dialog'].open) el['loading-dialog'].close();
+    }
+    function confirmReplacement() {
+      return new Promise(resolve => {
+        const dialog = el['confirm-dialog'];
+        const settle = accepted => {
+          dialog.removeEventListener('cancel', onCancel);
+          el['confirm-cancel'].removeEventListener('click', onReject);
+          el['confirm-accept'].removeEventListener('click', onAccept);
+          if (dialog.open) dialog.close();
+          resolve(accepted);
+        };
+        const onCancel = event => { event.preventDefault(); settle(false); };
+        const onReject = () => settle(false);
+        const onAccept = () => settle(true);
+        dialog.addEventListener('cancel', onCancel);
+        el['confirm-cancel'].addEventListener('click', onReject);
+        el['confirm-accept'].addEventListener('click', onAccept);
+        dialog.showModal();
+        el['confirm-cancel'].focus({preventScroll:true});
+      });
     }
     async function readJson(response) {
       const text = await response.text();
@@ -402,7 +524,7 @@
       const transfer = new DataTransfer();
       transfer.items.add(file);
       el['bom-file'].files = transfer.files;
-      message(`${file.name} is ready. Select the assembly, then preview the BOM.`, 'ok');
+      notify(`${file.name} is ready. Select the assembly, then preview the BOM.`, 'success', 'BOM File Ready');
     }
     function partText(part) {
       return [part.label || part.name, part.ipn, part.category].filter(Boolean).join(' · ');
@@ -411,22 +533,21 @@
       if (!part || Array.from(select.options).some(option => String(option.value) === String(part.pk))) return;
       const option = document.createElement('option'); option.value = part.pk; option.textContent = partText(part); option.selected = selected; select.appendChild(option);
     }
-    async function searchAssemblies() {
+    async function searchAssemblies(showProgress=true) {
       const button = el['assembly-search'];
-      const originalLabel = button.textContent;
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
-      button.textContent = 'Searching…';
+      if (showProgress) showLoading('Searching Assemblies…', 'Looking for matching assembly parts in InvenTree.');
       try {
         const result = await getJson(`parts/?assemblies=1&q=${encodeURIComponent(el['assembly-query'].value.trim())}`);
         const current = el.assembly.value;
         el.assembly.innerHTML = '<option value="">Select an assembly</option>';
         for (const part of result.parts || []) addPartOption(el.assembly, part, String(part.pk) === current);
-        if (!(result.parts || []).length) message('No assembly parts found. Try a different name or IPN.', 'warn'); else message('');
+        if (!(result.parts || []).length) notify('No assembly parts found. Try a different name or IPN.', 'warning', 'No Assemblies Found');
       } finally {
+        if (showProgress) hideLoading();
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        button.textContent = originalLabel;
       }
     }
     async function preview() {
@@ -435,65 +556,54 @@
       const form = new FormData(); form.append('file', file); form.append('assembly_id', el.assembly.value);
       el.preview.disabled = true;
       el.preview.setAttribute('aria-busy', 'true');
-      el.preview.textContent = 'Checking Stock…';
-      message('Parsing the BOM and checking InvenTree and JLCPCB stock…');
+      showLoading('Checking BOM & Stock…', 'Parsing the file and comparing InvenTree and JLCPCB availability.');
       try {
         const response = await fetch('preview/', {method:'POST', headers:{'X-CSRFToken':csrf()}, body:form});
-        const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Preview failed');
-        state.preview = body; renderPreview(); message('Preview ready. Review every match before finalizing.', 'ok');
+        const body = await readJson(response); if (!response.ok) throw new Error(body.error || 'Preview failed');
+        state.preview = body;
+        renderPreview();
+        notify('Review every part match before finalizing the BOM.', 'success', 'Preview Ready');
       } finally {
+        hideLoading();
         el.preview.disabled = false;
         el.preview.removeAttribute('aria-busy');
-        el.preview.textContent = 'Preview BOM & Check Stock';
       }
     }
     async function testConnection() {
       el['test-connection'].disabled = true;
       el['test-connection'].setAttribute('aria-busy', 'true');
-      el['test-connection'].textContent = 'Testing…';
-      el['connection-result'].textContent = 'Testing…';
+      showLoading('Testing JLCPCB Connection…', 'Verifying credentials and API access.');
       try {
         const result = await postJson('test-connection/', {});
         const labels = {component_catalogue:'Component catalogue', private_inventory:'Private inventory'};
         const credentialLabels = {app_id:'App ID', access_key:'Access Key', secret_key:'Secret Key'};
         const saved = Object.entries(result.configured || {}).map(([name,isSet]) => `${credentialLabels[name] || name}: ${isSet ? 'saved' : 'missing'}`);
         const details = Object.entries(result.checks || {}).map(([name,check]) => `${labels[name] || name}: ${check.ok ? 'OK' : check.message}`);
-        el['connection-result'].textContent = [result.message, ...saved, ...details].join(' · ');
-        el['connection-result'].style.color = result.ok ? 'var(--ok)' : 'var(--danger)';
-      } catch (error) {
-        el['connection-result'].textContent = `Test failed: ${error.message}`;
-        el['connection-result'].style.color = 'var(--danger)';
-        throw error;
+        notify([result.message, ...saved, ...details].join(' · '), result.ok ? 'success' : 'error', result.ok ? 'JLCPCB Connected' : 'Connection Check Failed');
       } finally {
+        hideLoading();
         el['test-connection'].disabled = false;
         el['test-connection'].removeAttribute('aria-busy');
-        el['test-connection'].textContent = 'Test Connection';
       }
     }
     async function syncStock() {
       el['sync-stock'].disabled = true;
       el['sync-stock'].setAttribute('aria-busy', 'true');
-      el['sync-stock'].textContent = 'Syncing…';
-      el['sync-result'].textContent = 'Syncing…';
+      showLoading('Syncing External Stock…', 'Updating plugin-managed JLCPCB inventory quantities.');
       try {
         const result = await postJson('sync-stock/', {});
-        el['sync-result'].textContent = [
+        notify([
           `${result.api_components} API component(s)`,
           `${result.matched_components} matched`,
           `${result.created} created`,
           `${result.updated} updated`,
           `${result.unchanged} unchanged`,
           `${result.unmatched_components} without an existing supplier SKU`,
-        ].join(' · ');
-        el['sync-result'].style.color = 'var(--ok)';
-      } catch (error) {
-        el['sync-result'].textContent = `Sync failed: ${error.message}`;
-        el['sync-result'].style.color = 'var(--danger)';
-        throw error;
+        ].join(' · '), 'success', 'External Stock Synced');
       } finally {
+        hideLoading();
         el['sync-stock'].disabled = false;
         el['sync-stock'].removeAttribute('aria-busy');
-        el['sync-stock'].textContent = 'Sync External Stock';
       }
     }
     function renderPreview() {
@@ -505,8 +615,7 @@
       el.review.classList.remove('hidden'); el['final-section'].classList.remove('hidden');
       el['create-missing-wrap'].classList.toggle('hidden', !data.settings.allow_create_missing);
       el['create-missing'].checked = false;
-      el['jlc-warning'].textContent = data.jlc_error || '';
-      el['jlc-warning'].style.display = data.jlc_error ? 'block' : 'none';
+      if (data.jlc_error) notify(`${data.jlc_error} Check the JLCPCB connection and try again.`, 'warning', 'JLCPCB Stock Unavailable');
     }
     function renderRow(row) {
       const tr = document.createElement('tr'); tr.dataset.row = row.row;
@@ -533,14 +642,14 @@
       const row = state.preview.rows.find(item => item.row === rowNumber);
       el['part-query'].value = row.jlcpcb_part || row.comment || '';
       el['part-results'].innerHTML = '';
-      el['part-dialog'].showModal(); searchParts().catch(error => message(error.message,'error'));
+      el['part-dialog'].showModal(); searchParts().catch(error => showError(error, 'Part Search Failed'));
     }
     async function searchParts() {
       const query=el['part-query'].value.trim(); if (query.length < 2) throw new Error('Enter at least two search characters');
       const button = el['part-search'];
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
-      button.textContent = 'Searching…';
+      showLoading('Searching Parts…', 'Looking through the InvenTree part catalogue.');
       try {
         const result=await getJson(`parts/?q=${encodeURIComponent(query)}`); el['part-results'].innerHTML='';
         for (const part of result.parts || []) {
@@ -552,9 +661,9 @@
         }
         if (!(result.parts || []).length) el['part-results'].textContent='No parts found. Try a name, IPN, JLC SKU, or manufacturer MPN.';
       } finally {
+        hideLoading();
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        button.textContent = 'Search Parts';
       }
     }
     function choosePart(part) {
@@ -566,37 +675,42 @@
       const selections={}; document.querySelectorAll('.part-selection').forEach(select => { if (select.value) selections[select.dataset.row]=select.value; });
       const unresolved=state.preview.rows.filter(row => !selections[String(row.row)]);
       if (unresolved.length && !el['create-missing'].checked) throw new Error(`${unresolved.length} BOM row(s) are unresolved`);
-      if (el.mode.value === 'replace' && !window.confirm('Replace the entire existing BOM? Existing BOM lines not in this upload will be deleted.')) return;
+      if (el.mode.value === 'replace' && !await confirmReplacement()) return;
       el.finalize.disabled=true;
       el.finalize.setAttribute('aria-busy', 'true');
-      el.finalize.textContent='Finalizing…';
-      message('Finalizing the BOM…');
+      showLoading('Finalizing BOM…', 'Saving the reviewed component matches to InvenTree.');
       try {
         const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:el.assembly.value,selections,
           mode:el.mode.value,validate:el.validate.checked,create_missing:el['create-missing'].checked});
-        message(`BOM finalized: ${result.created} created, ${result.updated} updated, ${result.deleted} removed. Can build locally: ${result.can_build}.`, 'ok');
-        const link=document.createElement('a'); link.href=result.bom_url; link.textContent=' Open the InvenTree BOM'; el.message.appendChild(link);
+        notify(`BOM finalized: ${result.created} created, ${result.updated} updated, ${result.deleted} removed. Can build locally: ${result.can_build}.`, 'success', 'BOM Finalized', {label:'Open InvenTree BOM',href:result.bom_url});
+        state.preview = null;
       } finally {
+        hideLoading();
         el.finalize.disabled=false;
         el.finalize.removeAttribute('aria-busy');
-        el.finalize.textContent='Finalize BOM';
       }
     }
-    el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>message(error.message,'error')));
-    el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>message(error.message,'error'));}});
-    el.preview.addEventListener('click',()=>preview().catch(error=>message(error.message,'error')));
-    el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>message(error.message,'error')));
-    el['sync-stock'].addEventListener('click',()=>syncStock().catch(error=>message(error.message,'error')));
-    el['part-search'].addEventListener('click',()=>searchParts().catch(error=>message(error.message,'error')));
-    el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>message(error.message,'error'));}});
+    el['loading-dialog'].addEventListener('cancel', event => event.preventDefault());
+    el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>showError(error, 'Assembly Search Failed')));
+    el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>showError(error, 'Assembly Search Failed'));}});
+    el.preview.addEventListener('click',()=>preview().catch(error=>showError(error, 'BOM Preview Failed')));
+    el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>showError(error, 'Connection Test Failed')));
+    el['sync-stock'].addEventListener('click',()=>syncStock().catch(error=>showError(error, 'Stock Sync Failed')));
+    el['part-search'].addEventListener('click',()=>searchParts().catch(error=>showError(error, 'Part Search Failed')));
+    el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>showError(error, 'Part Search Failed'));}});
     el['part-close'].addEventListener('click',()=>el['part-dialog'].close());
-    el.finalize.addEventListener('click',()=>finalizeBom().catch(error=>message(error.message,'error')));
+    el.finalize.addEventListener('click',()=>finalizeBom().catch(error=>showError(error, 'BOM Finalization Failed')));
+    window.addEventListener('beforeunload', event => {
+      if (!state.preview) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
     (async()=>{
       const initial=document.body.dataset.initialPart;
-      if(initial){el['assembly-query'].value=initial; await searchAssemblies(); if(Array.from(el.assembly.options).some(o=>o.value===initial)) el.assembly.value=initial;}
-      else await searchAssemblies();
+      if(initial){el['assembly-query'].value=initial; await searchAssemblies(false); if(Array.from(el.assembly.options).some(o=>o.value===initial)) el.assembly.value=initial;}
+      else await searchAssemblies(false);
       await restoreDashboardUpload();
-    })().catch(error=>message(error.message,'error'));
+    })().catch(error=>showError(error, 'Page Setup Failed'));
   </script>
 </body>
 </html>
