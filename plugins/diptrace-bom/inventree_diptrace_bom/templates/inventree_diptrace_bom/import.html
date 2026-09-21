@@ -364,7 +364,7 @@
   </dialog>
 
   <script>
-    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '' };
+    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false };
     const el = Object.fromEntries([
       'assembly-query','assembly-toggle','assembly','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
@@ -552,7 +552,10 @@
     function selectAssembly(part) {
       if (!part) return;
       const text = partText(part);
-      el.assembly.value = String(part.pk);
+      const id = String(part.pk);
+      state.assemblySelectionLock = true;
+      state.selectedAssemblyId = id;
+      el.assembly.value = id;
       el['assembly-query'].value = text;
       state.selectedAssemblyText = text;
       el['assembly-status'].textContent = `${part.label || part.name || 'Assembly'} selected.`;
@@ -561,6 +564,7 @@
       }
       el['assembly-query'].focus({preventScroll:true});
       setAssemblyOptionsOpen(false);
+      window.setTimeout(() => { state.assemblySelectionLock = false; }, 0);
     }
     function setActiveAssembly(index) {
       const options = Array.from(el['assembly-options'].querySelectorAll('.combobox-option'));
@@ -623,9 +627,10 @@
       state.assemblySearchTimer = window.setTimeout(() => searchAssemblies(true).catch(error => showError(error, 'Assembly Search Failed')), 250);
     }
     async function preview() {
-      if (!el.assembly.value) throw new Error('Select an assembly / finished product');
+      const assemblyId = state.selectedAssemblyId || el.assembly.value;
+      if (!assemblyId) throw new Error('Select an assembly / finished product');
       const file = el['bom-file'].files[0]; if (!file) throw new Error('Select a DipTrace BOM file');
-      const form = new FormData(); form.append('file', file); form.append('assembly_id', el.assembly.value);
+      const form = new FormData(); form.append('file', file); form.append('assembly_id', assemblyId);
       el.preview.disabled = true;
       el.preview.setAttribute('aria-busy', 'true');
       showLoading('Checking BOM & Stock…', 'Parsing the file and comparing InvenTree and JLCPCB availability.');
@@ -752,7 +757,7 @@
       el.finalize.setAttribute('aria-busy', 'true');
       showLoading('Finalizing BOM…', 'Saving the reviewed component matches to InvenTree.');
       try {
-        const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:el.assembly.value,selections,
+        const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:state.selectedAssemblyId || el.assembly.value,selections,
           mode:el.mode.value,validate:el.validate.checked,create_missing:el['create-missing'].checked});
         notify(`BOM finalized: ${result.created} created, ${result.updated} updated, ${result.deleted} removed. Can build locally: ${result.can_build}.`, 'success', 'BOM Finalized', {label:'Open InvenTree BOM',href:result.bom_url});
         state.preview = null;
@@ -765,9 +770,11 @@
     el['loading-dialog'].addEventListener('cancel', event => event.preventDefault());
     el['bom-file'].addEventListener('change', updateSelectedFileName);
     el['assembly-query'].addEventListener('input', () => {
+      if (state.assemblySelectionLock) return;
       if (el['assembly-query'].value !== state.selectedAssemblyText) {
         el.assembly.value = '';
         state.selectedAssemblyText = '';
+        state.selectedAssemblyId = '';
       }
       queueAssemblySearch();
     });
