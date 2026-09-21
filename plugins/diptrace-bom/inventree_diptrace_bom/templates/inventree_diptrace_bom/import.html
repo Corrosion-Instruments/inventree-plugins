@@ -156,8 +156,13 @@
     .shortage-source.missing strong { color:var(--danger); }
     button.shortage-exclude { min-height:30px; justify-self:end; padding:0 9px; font-size:12px; }
     tbody tr.target-shortage td:first-child { box-shadow:inset 3px 0 0 #f79009; }
-    .calculation-toolbar { min-height:36px; display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:8px; color:var(--muted); font-size:12px; }
+    .calculation-toolbar { min-height:36px; display:flex; align-items:flex-start; justify-content:flex-end; gap:10px; margin-bottom:8px; color:var(--muted); font-size:12px; }
     .calculation-toolbar button { min-height:30px; padding:0 9px; font-size:12px; }
+    .calculation-exclusion-badges { display:flex; flex:1; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    button.calculation-exclusion-badge { min-height:30px; max-width:260px; display:inline-flex; align-items:center; gap:6px; border-radius:6px; background:#f7f8fa; color:#475467; font-weight:500; }
+    button.calculation-exclusion-badge:hover:not(:disabled),button.calculation-exclusion-badge:focus-visible { background:#eef0f3; color:var(--ink); }
+    .calculation-exclusion-badge span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .calculation-exclusion-badge .icon { flex:0 0 auto; }
     .table-wrap { max-width:100%; overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
     table { width:100%; min-width:1380px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
     col.col-calc { width:58px; }
@@ -374,7 +379,7 @@
             </div>
           </div>
           <div id="calculation-toolbar" class="calculation-toolbar hidden" aria-live="polite">
-            <span id="calculation-exclusion-count"></span>
+            <div id="calculation-exclusion-count" class="calculation-exclusion-badges" aria-label="Components excluded from build calculations"></div>
             <button id="reset-calculation-exclusions" class="secondary" type="button">Reset exclusions</button>
           </div>
           <div class="table-wrap" tabindex="0" aria-label="Scrollable BOM review table">
@@ -874,6 +879,27 @@
     function calculationRows() {
       return state.preview ? state.preview.rows.filter(row => !state.calculationExclusions.has(String(row.row))) : [];
     }
+    function calculationExclusionLabel(row) {
+      const component=row.jlcpcb_part || row.comment || row.footprint || `BOM row ${row.row}`;
+      return row.designators ? `${row.designators} · ${component}` : component;
+    }
+    function renderCalculationExclusionBadges() {
+      const container=el['calculation-exclusion-count'];
+      container.replaceChildren();
+      for (const key of state.calculationExclusions) {
+        const row=state.preview?.rows.find(item=>String(item.row) === key);
+        if (!row) continue;
+        const label=calculationExclusionLabel(row);
+        const badge=document.createElement('button');
+        badge.type='button'; badge.className='secondary calculation-exclusion-badge';
+        badge.title=`Include ${label} in build calculations`;
+        badge.setAttribute('aria-label', `Include ${label} in build calculations`);
+        const text=document.createElement('span'); text.textContent=label; badge.appendChild(text);
+        badge.insertAdjacentHTML('beforeend','<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>');
+        badge.addEventListener('click',()=>setCalculationInclusion(row.row,true,true));
+        container.appendChild(badge);
+      }
+    }
     function setCalculationInclusion(rowNumber,included,announce=false) {
       const key=String(rowNumber);
       if (included) state.calculationExclusions.delete(key); else state.calculationExclusions.add(key);
@@ -886,7 +912,10 @@
       }
       const row=state.preview?.rows.find(item=>String(item.row) === key);
       updateBuildCalculations();
-      if (announce && row) notify(`${row.designators || `BOM row ${row.row}`} remains in the BOM but is excluded from build calculations.`, 'info', 'Excluded from Calculations');
+      if (announce && row) {
+        const component=row.designators || `BOM row ${row.row}`;
+        notify(included ? `${component} is included in build calculations again.` : `${component} remains in the BOM but is excluded from build calculations.`, 'info', included ? 'Included in Calculations' : 'Excluded from Calculations');
+      }
     }
     function updateBuildCalculations() {
       if (!state.preview) return;
@@ -897,7 +926,7 @@
       el['metric-external-builds'].textContent=externalCapacities.length ? formatStock(Math.min(...externalCapacities)) : '—';
       const excluded=state.calculationExclusions.size;
       el['calculation-toolbar'].classList.toggle('hidden',excluded === 0);
-      el['calculation-exclusion-count'].textContent=`${excluded} component line${excluded === 1 ? '' : 's'} excluded from calculations only`;
+      renderCalculationExclusionBadges();
       const title=excluded ? `${excluded} BOM line${excluded === 1 ? '' : 's'} excluded from this calculation; the finalized BOM is unchanged` : '';
       el['metric-local-builds'].parentElement.title=title || 'Complete products buildable from local InvenTree stock';
       el['metric-external-builds'].parentElement.title=title || 'Complete products buildable from JLC Stock plus My Inventory';
