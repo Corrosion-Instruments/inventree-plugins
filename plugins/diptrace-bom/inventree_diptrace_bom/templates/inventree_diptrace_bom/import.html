@@ -6,146 +6,311 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{{ title }}</title>
   <style>
-    :root { color-scheme:light; --ink:#15202b; --muted:#667085; --line:#d8dee6; --surface:#fff;
-      --band:#f5f7fa; --action:#1769d2; --ok:#067647; --warn:#b54708; --danger:#b42318; }
+    :root {
+      color-scheme:light;
+      --ink:#182230;
+      --muted:#667085;
+      --subtle:#98a2b3;
+      --line:#d0d5dd;
+      --line-soft:#e4e7ec;
+      --surface:#fff;
+      --canvas:#f6f7f9;
+      --band:#f9fafb;
+      --action:#155eef;
+      --action-hover:#004eeb;
+      --action-soft:#eff4ff;
+      --ok:#067647;
+      --ok-soft:#ecfdf3;
+      --warn:#b54708;
+      --warn-soft:#fff7ed;
+      --danger:#b42318;
+      --danger-soft:#fef3f2;
+      --shadow:0 1px 2px rgba(16,24,40,.05);
+    }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--band); }
-    header, main { width:min(1600px,calc(100% - 32px)); margin:0 auto; }
-    header { padding:22px 0 12px; }
-    nav { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:16px; }
-    nav div { display:flex; gap:14px; flex-wrap:wrap; }
+    html { background:var(--canvas); scroll-behavior:smooth; }
+    body { margin:0; min-width:320px; font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--canvas); }
     a { color:var(--action); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    h1 { margin:0; font-size:28px; }
-    main { display:grid; gap:16px; padding-bottom:36px; }
-    section { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:16px; }
-    h2 { margin:0 0 14px; font-size:18px; }
-    .setup { display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.3fr); gap:18px; }
-    .field { display:grid; gap:6px; color:var(--muted); font-size:13px; }
-    .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
-    input,select,button { min-height:40px; border-radius:6px; font:inherit; }
-    input,select { width:100%; border:1px solid var(--line); padding:8px 10px; background:#fff; color:var(--ink); }
-    button { border:1px solid var(--action); padding:8px 14px; background:var(--action); color:#fff; cursor:pointer; white-space:nowrap; }
-    button.secondary { background:#fff; color:var(--action); }
-    button.small { min-height:32px; padding:5px 9px; font-size:13px; }
+    a:hover { color:var(--action-hover); text-decoration:underline; text-underline-offset:3px; }
+    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(21,94,239,.24); outline-offset:2px; }
+    button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(21,94,239,.12); }
+    button { min-height:40px; border:1px solid var(--action); border-radius:6px; padding:8px 14px; background:var(--action); color:#fff; font-weight:650; cursor:pointer; white-space:nowrap; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
+    button:hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); }
+    button:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(16,24,40,.24); }
+    button.secondary { border-color:var(--line); background:var(--surface); color:#344054; }
+    button.secondary:hover:not(:disabled) { border-color:#98a2b3; background:var(--band); color:var(--ink); }
+    button.small { min-height:34px; padding:5px 10px; font-size:13px; }
     button:disabled { opacity:.55; cursor:not-allowed; }
-    .actions { display:flex; align-items:end; gap:10px; flex-wrap:wrap; margin-top:14px; }
-    .actions .field { min-width:180px; }
-    .checkbox { display:flex; align-items:center; gap:7px; color:var(--ink); font-size:14px; min-height:40px; }
-    .checkbox input { width:auto; min-height:auto; }
-    .message { display:none; border-radius:6px; padding:10px 12px; background:#eef4ff; color:#1849a9; }
-    .message.ok { background:#ecfdf3; color:var(--ok); }
-    .message.error { background:#fff1f0; color:var(--danger); }
-    .message.warn { background:#fff7ed; color:var(--warn); }
-    .summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
-    .metric { border:1px solid var(--line); border-radius:6px; padding:10px; min-width:0; }
+    input,select { min-height:42px; width:100%; border:1px solid var(--line); border-radius:6px; padding:8px 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    input:hover,select:hover { border-color:#98a2b3; }
+    input::placeholder { color:var(--subtle); }
+    .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
+    .skip-link:focus { transform:translateY(0); }
+    .site-header { border-bottom:1px solid var(--line-soft); background:var(--surface); }
+    .nav-shell,.page-shell { width:min(1520px,calc(100% - 40px)); margin:0 auto; }
+    .nav-shell { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; color:#101828; font-size:16px; font-weight:750; }
+    .brand:hover { color:var(--action); text-decoration:none; }
+    .brand-mark { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action); color:#fff; font-size:13px; letter-spacing:-.04em; }
+    .nav-links { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+    .nav-links a { border-radius:6px; padding:8px 10px; color:#475467; font-size:14px; font-weight:550; }
+    .nav-links a:hover { background:var(--band); color:var(--ink); text-decoration:none; }
+    .page-shell { padding:28px 0 48px; }
+    .page-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
+    .eyebrow { margin:0 0 6px; color:var(--action); font-size:13px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; }
+    h1,h2,h3 { text-wrap:balance; }
+    h1 { margin:0; font-size:clamp(26px,3vw,34px); line-height:1.18; letter-spacing:-.025em; }
+    .page-description { max-width:720px; margin:8px 0 0; color:var(--muted); font-size:15px; line-height:1.55; text-wrap:pretty; }
+    .workflow-note { flex:none; border:1px solid var(--line-soft); border-radius:6px; padding:8px 10px; background:var(--surface); color:#475467; font-size:13px; box-shadow:var(--shadow); }
+    main { display:grid; gap:18px; }
+    section { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
+    .section-header { display:flex; align-items:flex-start; gap:12px; padding:18px 20px; border-bottom:1px solid var(--line-soft); }
+    .section-heading-copy { min-width:0; }
+    .section-heading-copy h2 { margin:0; font-size:18px; line-height:1.35; }
+    .section-heading-copy p { margin:4px 0 0; color:var(--muted); font-size:14px; line-height:1.45; text-wrap:pretty; }
+    .step-index { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action-soft); color:var(--action); font-size:13px; font-weight:750; }
+    .section-body { padding:20px; }
+    .integration-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
+    .integration-action { min-width:0; padding:16px; }
+    .integration-action + .integration-action { border-left:1px solid var(--line-soft); }
+    .integration-action h3 { margin:0; font-size:15px; }
+    .integration-action p { min-height:40px; margin:5px 0 12px; color:var(--muted); font-size:13px; line-height:1.5; }
+    .integration-control { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .inline-result { min-width:0; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
+    .credential-note { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.5; }
+    .setup { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; }
+    .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:650; }
+    .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
+    .field-stack { display:grid; gap:14px; }
+    .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+    .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
+    .actions .field { min-width:220px; }
+    .checkbox { min-height:40px; display:inline-flex; align-items:center; gap:9px; border-radius:6px; color:#344054; font-size:14px; cursor:pointer; }
+    .checkbox input { width:16px; min-height:16px; height:16px; margin:0; box-shadow:none; }
+    .message { display:none; border:1px solid #b2ccff; border-radius:6px; padding:11px 13px; background:var(--action-soft); color:#1849a9; font-size:14px; line-height:1.5; }
+    .message.ok { border-color:#abefc6; background:var(--ok-soft); color:var(--ok); }
+    .message.error { border-color:#fecdca; background:var(--danger-soft); color:var(--danger); }
+    .message.warn { border-color:#fedf89; background:var(--warn-soft); color:var(--warn); }
+    .summary { display:grid; grid-template-columns:1.4fr repeat(4,1fr); margin-bottom:16px; border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
+    .metric { min-width:0; padding:13px 14px; background:var(--band); }
+    .metric + .metric { border-left:1px solid var(--line-soft); }
     .metric span { display:block; color:var(--muted); font-size:12px; }
-    .metric strong { display:block; margin-top:3px; font-size:18px; overflow-wrap:anywhere; }
-    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:6px; }
-    table { width:100%; min-width:1450px; border-collapse:collapse; font-size:13px; }
-    th,td { border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+    .metric strong { display:block; margin-top:4px; font-size:18px; line-height:1.3; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+    .table-wrap { overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
+    table { width:100%; min-width:1450px; border-collapse:separate; border-spacing:0; font-size:13px; }
+    th,td { border-bottom:1px solid var(--line-soft); border-right:1px solid var(--line-soft); padding:10px; text-align:left; vertical-align:top; }
     th:last-child,td:last-child { border-right:0; }
-    th { position:sticky; top:0; background:#f8fafc; color:var(--muted); font-weight:650; z-index:1; }
-    td select { min-width:260px; min-height:34px; padding:5px 7px; }
-    .part-cell { display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:6px; }
-    .status { display:inline-block; margin-top:5px; border-radius:999px; padding:2px 7px; font-size:11px; background:#f2f4f7; }
-    .status.matched { color:var(--ok); background:#ecfdf3; }
-    .status.unmatched,.status.ambiguous { color:var(--warn); background:#fff7ed; }
-    .zero { color:var(--danger); font-weight:650; }
+    tbody tr:last-child td { border-bottom:0; }
+    tbody tr:hover td { background:#fcfcfd; }
+    th { position:sticky; top:0; z-index:2; background:#f2f4f7; color:#475467; font-size:12px; font-weight:700; letter-spacing:.01em; }
+    td select { min-width:260px; min-height:36px; padding:5px 8px; }
+    td.numeric,th.numeric { text-align:right; font-variant-numeric:tabular-nums; }
+    .part-cell { display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:7px; }
+    .status { display:inline-block; margin-top:6px; border-radius:999px; padding:3px 8px; background:#f2f4f7; color:#475467; font-size:11px; line-height:1.35; }
+    .status.matched { color:var(--ok); background:var(--ok-soft); }
+    .status.unmatched,.status.ambiguous { color:var(--warn); background:var(--warn-soft); }
+    .zero { color:var(--danger); font-weight:700; }
     .hidden { display:none !important; }
-    dialog { width:min(700px,calc(100% - 32px)); border:1px solid var(--line); border-radius:8px; padding:0; box-shadow:0 20px 45px #10182833; }
-    dialog::backdrop { background:#10182866; }
-    .dialog-body { padding:18px; display:grid; gap:12px; }
-    .search-results { max-height:360px; overflow:auto; display:grid; gap:7px; }
-    .result { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:9px; border:1px solid var(--line); border-radius:6px; }
-    .result small { color:var(--muted); display:block; margin-top:3px; }
-    @media(max-width:900px) { .setup,.summary { grid-template-columns:1fr; } header,main { width:min(100% - 20px,1600px); } }
+    .visually-hidden { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
+    dialog { width:min(720px,calc(100% - 32px)); max-height:calc(100dvh - 40px); border:1px solid var(--line-soft); border-radius:8px; padding:0; box-shadow:0 24px 48px rgba(16,24,40,.22); overscroll-behavior:contain; }
+    dialog::backdrop { background:rgba(16,24,40,.55); }
+    .dialog-body { display:grid; gap:16px; padding:20px; }
+    .dialog-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .dialog-header h2 { margin:0; font-size:19px; }
+    .dialog-header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+    .search-results { max-height:360px; overflow:auto; display:grid; gap:8px; overscroll-behavior:contain; }
+    .result { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px; border:1px solid var(--line-soft); border-radius:6px; }
+    .result div { min-width:0; }
+    .result strong,.result small { overflow-wrap:anywhere; }
+    .result small { display:block; margin-top:3px; color:var(--muted); line-height:1.4; }
+    .dialog-actions { display:flex; justify-content:flex-end; }
+    @media(max-width:900px) {
+      .nav-shell,.page-shell { width:min(100% - 24px,1520px); }
+      .page-heading { display:block; }
+      .workflow-note { display:inline-block; margin-top:14px; }
+      .setup,.integration-grid,.summary { grid-template-columns:1fr; }
+      .integration-action + .integration-action,.metric + .metric { border-left:0; border-top:1px solid var(--line-soft); }
+      .summary { display:grid; }
+      .nav-shell { align-items:flex-start; padding:14px 0; }
+      .nav-links { justify-content:flex-end; }
+    }
+    @media(max-width:600px) {
+      .nav-shell { display:block; }
+      .nav-links { margin-top:10px; justify-content:flex-start; gap:2px; }
+      .nav-links a { padding:7px 8px; }
+      .page-shell { padding-top:20px; }
+      .section-header,.section-body { padding:16px; }
+      .row,.part-cell { grid-template-columns:1fr; }
+      .row button,.part-cell button,.actions > button { width:100%; }
+      .actions { align-items:stretch; }
+      .actions .field { width:100%; min-width:0; }
+      .checkbox { width:100%; }
+    }
+    @media(prefers-reduced-motion:reduce) {
+      html { scroll-behavior:auto; }
+      *,*::before,*::after { transition-duration:.01ms !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; }
+    }
   </style>
 </head>
 <body data-initial-part="{{ initial_part }}">
-  <header>
-    <nav>
-      <a href="/web/"><strong>InvenTree</strong></a>
-      <div><a href="/web/part/">Parts</a><a href="/web/stock/">Stock</a><a href="/web/manufacturing/">Manufacturing</a><a href="/web/settings/plugins/">Plugin settings</a></div>
+  <a class="skip-link" href="#main-content">Skip to Main Content</a>
+  <header class="site-header">
+    <nav class="nav-shell" aria-label="Primary navigation">
+      <a class="brand" href="/web/" aria-label="InvenTree Dashboard">
+        <span class="brand-mark" aria-hidden="true">IT</span>
+        <span>InvenTree</span>
+      </a>
+      <div class="nav-links">
+        <a href="/web/part/">Parts</a>
+        <a href="/web/stock/">Stock</a>
+        <a href="/web/manufacturing/">Manufacturing</a>
+        <a href="/web/settings/plugins/">Plugin Settings</a>
+      </div>
     </nav>
-    <h1>DipTrace BOM</h1>
   </header>
-  <main>
-    <div id="message" class="message"></div>
-    <section>
-      <h2>JLCPCB API connection</h2>
-      <p style="color:var(--muted);margin-top:0">Stored credentials are protected by InvenTree and appear as <strong>***</strong>. The saved values cannot be revealed in the browser.</p>
-      <div class="actions">
-        <button id="test-connection" class="secondary" type="button">Test JLCPCB connection</button>
-        <span id="connection-result" aria-live="polite"></span>
+
+  <div class="page-shell">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">Manufacturing Tools</p>
+        <h1>DipTrace BOM Importer</h1>
+        <p class="page-description">Match a DipTrace BOM to InvenTree parts, compare local and JLCPCB availability, then publish a reviewed BOM.</p>
       </div>
-      <div class="actions">
-        <button id="sync-stock" class="secondary" type="button">Sync JLCPCB stock now</button>
-        <span id="sync-result" aria-live="polite"></span>
-      </div>
-      <p style="color:var(--muted);margin-bottom:0">The sync only updates plugin-managed external stock for exact, existing JLC supplier-SKU matches. It never changes local stock or creates catalog parts.</p>
-    </section>
-    <section>
-      <h2>1. Select the product and BOM file</h2>
-      <div class="setup">
-        <div>
-          <label class="field">Assembly search
-            <div class="row"><input id="assembly-query" placeholder="Name or IPN"><button id="assembly-search" class="secondary" type="button">Search</button></div>
-          </label>
-          <label class="field" style="margin-top:10px">Assembly / finished product
-            <select id="assembly"><option value="">Select an assembly</option></select>
-          </label>
+      <div class="workflow-note" aria-label="Workflow length">3-step workflow</div>
+    </div>
+
+    <main id="main-content" tabindex="-1">
+      <div id="message" class="message" role="status" aria-live="polite" tabindex="-1"></div>
+
+      <section aria-labelledby="connection-heading">
+        <div class="section-header">
+          <span class="step-index" aria-hidden="true">API</span>
+          <div class="section-heading-copy">
+            <h2 id="connection-heading">JLCPCB API Connection</h2>
+            <p>Check credentials or refresh plugin-managed external stock before importing a BOM.</p>
+          </div>
         </div>
-        <label class="field">DipTrace BOM (.csv, .xlsx or .xlsm)
-          <input id="bom-file" type="file" accept=".csv,.txt,.xlsx,.xlsm">
-          <span>Expected fields: Designator, Footprint, Comment, Quantity and JLCPCB Part #.</span>
-        </label>
-      </div>
-      <div class="actions"><button id="preview" type="button">Preview and check stock</button></div>
-    </section>
+        <div class="section-body">
+          <p class="credential-note">Stored credentials are protected by InvenTree and appear as <strong>***</strong>. Saved values cannot be revealed in the browser.</p>
+          <div class="integration-grid">
+            <div class="integration-action">
+              <h3>Connection Test</h3>
+              <p>Verify access to the public component catalogue and private inventory.</p>
+              <div class="integration-control">
+                <button id="test-connection" class="secondary" type="button">Test Connection</button>
+                <span id="connection-result" class="inline-result" role="status" aria-live="polite"></span>
+              </div>
+            </div>
+            <div class="integration-action">
+              <h3>External Stock Sync</h3>
+              <p>Update exact, existing JLC supplier-SKU matches. Local stock and catalogue parts remain unchanged.</p>
+              <div class="integration-control">
+                <button id="sync-stock" class="secondary" type="button">Sync External Stock</button>
+                <span id="sync-result" class="inline-result" role="status" aria-live="polite"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="review" class="hidden">
-      <h2>2. Review and resolve</h2>
-      <div class="summary">
-        <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
-        <div class="metric"><span>BOM lines</span><strong id="metric-lines">0</strong></div>
-        <div class="metric"><span>Matched</span><strong id="metric-matched">0</strong></div>
-        <div class="metric"><span>Unresolved</span><strong id="metric-unresolved">0</strong></div>
-        <div class="metric"><span>Can build locally</span><strong id="metric-can-build">0</strong></div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>References</th><th>Value / comment</th><th>Footprint</th><th>Qty</th><th>JLC #</th>
-            <th>InvenTree part</th><th>Local available</th><th>Line can build</th>
-            <th>JLC public</th><th>My Parts total</th><th>Global sourcing</th><th>Consigned</th>
-          </tr></thead>
-          <tbody id="bom-rows"></tbody>
-        </table>
-      </div>
-      <div id="jlc-warning" class="message warn" style="margin-top:12px"></div>
-    </section>
+      <section aria-labelledby="select-heading">
+        <div class="section-header">
+          <span class="step-index" aria-hidden="true">1</span>
+          <div class="section-heading-copy">
+            <h2 id="select-heading">Select Product &amp; BOM File</h2>
+            <p>Choose the destination assembly and upload the exported DipTrace BOM.</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="setup">
+            <div class="field-stack">
+              <div class="field">
+                <label for="assembly-query">Assembly Search</label>
+                <div class="row">
+                  <input id="assembly-query" name="assembly_query" type="search" placeholder="Search by name or IPN…" autocomplete="off" spellcheck="false">
+                  <button id="assembly-search" class="secondary" type="button">Search Assemblies</button>
+                </div>
+              </div>
+              <label class="field" for="assembly">Assembly / Finished Product
+                <select id="assembly" name="assembly"><option value="">Select an assembly</option></select>
+              </label>
+            </div>
+            <label class="field" for="bom-file">DipTrace BOM File
+              <input id="bom-file" name="bom_file" type="file" accept=".csv,.txt,.xlsx,.xlsm">
+              <span class="field-help">CSV, XLSX, or XLSM with Designator, Footprint, Comment, Quantity, and JLCPCB Part # fields.</span>
+            </label>
+          </div>
+          <div class="actions"><button id="preview" type="button">Preview BOM &amp; Check Stock</button></div>
+        </div>
+      </section>
 
-    <section id="final-section" class="hidden">
-      <h2>3. Finalize the InvenTree BOM</h2>
-      <p style="color:var(--muted);margin-top:0">Unresolved rows must be matched, or explicitly created if an administrator enabled that option.</p>
-      <div class="actions">
-        <label class="field">Import mode
-          <select id="mode"><option value="merge">Merge / update matching lines</option><option value="replace">Replace the entire existing BOM</option></select>
-        </label>
-        <label class="checkbox"><input id="validate" type="checkbox"> Mark imported BOM lines validated</label>
-        <label id="create-missing-wrap" class="checkbox hidden"><input id="create-missing" type="checkbox"> Create unresolved component parts</label>
-        <button id="finalize" type="button">Finalize BOM</button>
-      </div>
-    </section>
-  </main>
+      <section id="review" class="hidden" aria-labelledby="review-heading">
+        <div class="section-header">
+          <span class="step-index" aria-hidden="true">2</span>
+          <div class="section-heading-copy">
+            <h2 id="review-heading">Review &amp; Resolve</h2>
+            <p>Confirm part matches and compare quantities across local and JLCPCB inventory.</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="summary" aria-label="BOM summary">
+            <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
+            <div class="metric"><span>BOM Lines</span><strong id="metric-lines">0</strong></div>
+            <div class="metric"><span>Matched</span><strong id="metric-matched">0</strong></div>
+            <div class="metric"><span>Unresolved</span><strong id="metric-unresolved">0</strong></div>
+            <div class="metric"><span>Can Build Locally</span><strong id="metric-can-build">0</strong></div>
+          </div>
+          <div class="table-wrap" tabindex="0" aria-label="Scrollable BOM review table">
+            <table>
+              <caption class="visually-hidden">DipTrace BOM lines with InvenTree matches and stock availability</caption>
+              <thead><tr>
+                <th scope="col">References</th><th scope="col">Value / Comment</th><th scope="col">Footprint</th><th class="numeric" scope="col">Qty</th><th scope="col">JLC #</th>
+                <th scope="col">InvenTree Part</th><th class="numeric" scope="col">Local Available</th><th class="numeric" scope="col">Line Can Build</th>
+                <th class="numeric" scope="col">JLC Public</th><th class="numeric" scope="col">My Parts Total</th><th class="numeric" scope="col">Global Sourcing</th><th class="numeric" scope="col">Consigned</th>
+              </tr></thead>
+              <tbody id="bom-rows"></tbody>
+            </table>
+          </div>
+          <div id="jlc-warning" class="message warn" role="status" aria-live="polite"></div>
+        </div>
+      </section>
 
-  <dialog id="part-dialog">
+      <section id="final-section" class="hidden" aria-labelledby="final-heading">
+        <div class="section-header">
+          <span class="step-index" aria-hidden="true">3</span>
+          <div class="section-heading-copy">
+            <h2 id="final-heading">Finalize InvenTree BOM</h2>
+            <p>Unresolved rows must be matched or explicitly created when that option is enabled.</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="actions">
+            <label class="field" for="mode">Import Mode
+              <select id="mode" name="import_mode"><option value="merge">Merge / update matching lines</option><option value="replace">Replace the entire existing BOM</option></select>
+            </label>
+            <label class="checkbox" for="validate"><input id="validate" name="validate" type="checkbox"> Mark imported BOM lines as validated</label>
+            <label id="create-missing-wrap" class="checkbox hidden" for="create-missing"><input id="create-missing" name="create_missing" type="checkbox"> Create unresolved component parts</label>
+            <button id="finalize" type="button">Finalize BOM</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="part-dialog" aria-labelledby="part-dialog-title">
     <div class="dialog-body">
-      <strong>Find an InvenTree part</strong>
-      <div class="row"><input id="part-query" placeholder="Name, IPN, JLC SKU or manufacturer MPN"><button id="part-search" type="button">Search</button></div>
-      <div id="part-results" class="search-results"></div>
-      <div><button id="part-close" class="secondary" type="button">Close</button></div>
+      <div class="dialog-header">
+        <div>
+          <h2 id="part-dialog-title">Find an InvenTree Part</h2>
+          <p>Search by catalogue identity, then select the exact match.</p>
+        </div>
+      </div>
+      <div class="field">
+        <label for="part-query">Part Search</label>
+        <div class="row"><input id="part-query" name="part_query" type="search" placeholder="Search by name, IPN, JLC SKU, or MPN…" autocomplete="off" spellcheck="false"><button id="part-search" type="button">Search Parts</button></div>
+      </div>
+      <div id="part-results" class="search-results" role="list" aria-live="polite"></div>
+      <div class="dialog-actions"><button id="part-close" class="secondary" type="button">Close</button></div>
     </div>
   </dialog>
 
@@ -166,7 +331,10 @@
       el.message.textContent = text || '';
       el.message.className = `message ${kind}`.trim();
       el.message.style.display = text ? 'block' : 'none';
-      if (text) window.scrollTo({top:0, behavior:'smooth'});
+      if (text) {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        window.scrollTo({top:0, behavior:reduceMotion ? 'auto' : 'smooth'});
+      }
     }
     async function readJson(response) {
       const text = await response.text();
@@ -242,25 +410,45 @@
       const option = document.createElement('option'); option.value = part.pk; option.textContent = partText(part); option.selected = selected; select.appendChild(option);
     }
     async function searchAssemblies() {
-      const result = await getJson(`parts/?assemblies=1&q=${encodeURIComponent(el['assembly-query'].value.trim())}`);
-      const current = el.assembly.value;
-      el.assembly.innerHTML = '<option value="">Select an assembly</option>';
-      for (const part of result.parts || []) addPartOption(el.assembly, part, String(part.pk) === current);
-      if (!(result.parts || []).length) message('No assembly parts found', 'warn'); else message('');
+      const button = el['assembly-search'];
+      const originalLabel = button.textContent;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Searching…';
+      try {
+        const result = await getJson(`parts/?assemblies=1&q=${encodeURIComponent(el['assembly-query'].value.trim())}`);
+        const current = el.assembly.value;
+        el.assembly.innerHTML = '<option value="">Select an assembly</option>';
+        for (const part of result.parts || []) addPartOption(el.assembly, part, String(part.pk) === current);
+        if (!(result.parts || []).length) message('No assembly parts found. Try a different name or IPN.', 'warn'); else message('');
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.textContent = originalLabel;
+      }
     }
     async function preview() {
       if (!el.assembly.value) throw new Error('Select an assembly / finished product');
       const file = el['bom-file'].files[0]; if (!file) throw new Error('Select a DipTrace BOM file');
       const form = new FormData(); form.append('file', file); form.append('assembly_id', el.assembly.value);
-      el.preview.disabled = true; message('Parsing BOM and checking InvenTree and JLCPCB stock…');
+      el.preview.disabled = true;
+      el.preview.setAttribute('aria-busy', 'true');
+      el.preview.textContent = 'Checking Stock…';
+      message('Parsing the BOM and checking InvenTree and JLCPCB stock…');
       try {
         const response = await fetch('preview/', {method:'POST', headers:{'X-CSRFToken':csrf()}, body:form});
         const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Preview failed');
         state.preview = body; renderPreview(); message('Preview ready. Review every match before finalizing.', 'ok');
-      } finally { el.preview.disabled = false; }
+      } finally {
+        el.preview.disabled = false;
+        el.preview.removeAttribute('aria-busy');
+        el.preview.textContent = 'Preview BOM & Check Stock';
+      }
     }
     async function testConnection() {
       el['test-connection'].disabled = true;
+      el['test-connection'].setAttribute('aria-busy', 'true');
+      el['test-connection'].textContent = 'Testing…';
       el['connection-result'].textContent = 'Testing…';
       try {
         const result = await postJson('test-connection/', {});
@@ -276,10 +464,14 @@
         throw error;
       } finally {
         el['test-connection'].disabled = false;
+        el['test-connection'].removeAttribute('aria-busy');
+        el['test-connection'].textContent = 'Test Connection';
       }
     }
     async function syncStock() {
       el['sync-stock'].disabled = true;
+      el['sync-stock'].setAttribute('aria-busy', 'true');
+      el['sync-stock'].textContent = 'Syncing…';
       el['sync-result'].textContent = 'Syncing…';
       try {
         const result = await postJson('sync-stock/', {});
@@ -298,6 +490,8 @@
         throw error;
       } finally {
         el['sync-stock'].disabled = false;
+        el['sync-stock'].removeAttribute('aria-busy');
+        el['sync-stock'].textContent = 'Sync External Stock';
       }
     }
     function renderPreview() {
@@ -319,13 +513,16 @@
       }
       const partTd = document.createElement('td'); const wrap = document.createElement('div'); wrap.className = 'part-cell';
       const select = document.createElement('select'); select.className = 'part-selection'; select.dataset.row = row.row;
+      select.name = `part_selection_${row.row}`;
+      select.setAttribute('aria-label', `InvenTree part for ${row.designators || `BOM row ${row.row}`}`);
       const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Unresolved'; select.appendChild(blank);
       addPartOption(select, row.match.part, true); for (const candidate of row.match.candidates || []) addPartOption(select, candidate, false);
       const find = document.createElement('button'); find.type='button'; find.className='secondary small'; find.textContent='Find';
+      find.setAttribute('aria-label', `Find an InvenTree part for ${row.designators || `BOM row ${row.row}`}`);
       find.addEventListener('click', () => openPartDialog(row.row)); wrap.append(select,find); partTd.appendChild(wrap);
       const badge = document.createElement('span'); badge.className=`status ${row.match.status}`; badge.textContent=row.match.reason; partTd.appendChild(badge); tr.appendChild(partTd);
       for (const value of [row.local.available,row.local.can_build,row.jlc.public_stock,row.jlc.private_total,row.jlc.global_sourcing,row.jlc.consigned]) {
-        const td=document.createElement('td'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
+        const td=document.createElement('td'); td.classList.add('numeric'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
       }
       return tr;
     }
@@ -338,15 +535,25 @@
     }
     async function searchParts() {
       const query=el['part-query'].value.trim(); if (query.length < 2) throw new Error('Enter at least two search characters');
-      const result=await getJson(`parts/?q=${encodeURIComponent(query)}`); el['part-results'].innerHTML='';
-      for (const part of result.parts || []) {
-        const item=document.createElement('div'); item.className='result';
-        const copy=document.createElement('div'); const name=document.createElement('strong'); name.textContent=part.label;
-        const meta=document.createElement('small'); meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
-        const choose=document.createElement('button'); choose.type='button'; choose.className='small'; choose.textContent='Select';
-        choose.addEventListener('click',()=>choosePart(part)); item.append(copy,choose); el['part-results'].appendChild(item);
+      const button = el['part-search'];
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Searching…';
+      try {
+        const result=await getJson(`parts/?q=${encodeURIComponent(query)}`); el['part-results'].innerHTML='';
+        for (const part of result.parts || []) {
+          const item=document.createElement('div'); item.className='result'; item.setAttribute('role', 'listitem');
+          const copy=document.createElement('div'); const name=document.createElement('strong'); name.textContent=part.label;
+          const meta=document.createElement('small'); meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
+          const choose=document.createElement('button'); choose.type='button'; choose.className='small'; choose.textContent='Select Part';
+          choose.addEventListener('click',()=>choosePart(part)); item.append(copy,choose); el['part-results'].appendChild(item);
+        }
+        if (!(result.parts || []).length) el['part-results'].textContent='No parts found. Try a name, IPN, JLC SKU, or manufacturer MPN.';
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.textContent = 'Search Parts';
       }
-      if (!(result.parts || []).length) el['part-results'].textContent='No parts found.';
     }
     function choosePart(part) {
       const select=document.querySelector(`.part-selection[data-row="${state.activeRow}"]`); addPartOption(select,part,true); select.value=String(part.pk);
@@ -358,13 +565,20 @@
       const unresolved=state.preview.rows.filter(row => !selections[String(row.row)]);
       if (unresolved.length && !el['create-missing'].checked) throw new Error(`${unresolved.length} BOM row(s) are unresolved`);
       if (el.mode.value === 'replace' && !window.confirm('Replace the entire existing BOM? Existing BOM lines not in this upload will be deleted.')) return;
-      el.finalize.disabled=true; message('Finalizing BOM…');
+      el.finalize.disabled=true;
+      el.finalize.setAttribute('aria-busy', 'true');
+      el.finalize.textContent='Finalizing…';
+      message('Finalizing the BOM…');
       try {
         const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:el.assembly.value,selections,
           mode:el.mode.value,validate:el.validate.checked,create_missing:el['create-missing'].checked});
         message(`BOM finalized: ${result.created} created, ${result.updated} updated, ${result.deleted} removed. Can build locally: ${result.can_build}.`, 'ok');
         const link=document.createElement('a'); link.href=result.bom_url; link.textContent=' Open the InvenTree BOM'; el.message.appendChild(link);
-      } finally { el.finalize.disabled=false; }
+      } finally {
+        el.finalize.disabled=false;
+        el.finalize.removeAttribute('aria-busy');
+        el.finalize.textContent='Finalize BOM';
+      }
     }
     el['assembly-search'].addEventListener('click',()=>searchAssemblies().catch(error=>message(error.message,'error')));
     el['assembly-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchAssemblies().catch(error=>message(error.message,'error'));}});
