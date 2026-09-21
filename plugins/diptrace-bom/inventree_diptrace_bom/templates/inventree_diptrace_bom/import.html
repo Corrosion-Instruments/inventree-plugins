@@ -72,11 +72,6 @@
     .workflow-note { border:1px solid var(--line); background:var(--surface); color:#344054; box-shadow:var(--shadow); }
     main { display:grid; gap:18px; }
     section { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
-    .section-header { display:flex; align-items:flex-start; gap:12px; padding:18px 20px; border-bottom:1px solid var(--line-soft); }
-    .section-heading-copy { min-width:0; }
-    .section-heading-copy h2 { margin:0; font-size:18px; line-height:1.35; }
-    .section-heading-copy p { margin:4px 0 0; color:var(--muted); font-size:14px; line-height:1.45; text-wrap:pretty; }
-    .step-index { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action-soft); color:var(--action); font-size:13px; font-weight:700; }
     .section-body { padding:20px; }
     .setup-layout { display:grid; gap:16px; }
     .setup-pair { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; }
@@ -182,7 +177,7 @@
       .nav-links { margin-top:10px; justify-content:flex-start; gap:2px; }
       .nav-links a { padding:7px 8px; }
       .page-shell { padding-top:20px; }
-      .section-header,.section-body { padding:16px; }
+      .section-body { padding:16px; }
       .row,.part-cell { grid-template-columns:1fr; }
       .row button,.part-cell button,.actions > button { width:100%; }
       .actions { align-items:stretch; }
@@ -287,14 +282,7 @@
         </div>
       </section>
 
-      <section id="final-section" class="hidden" aria-labelledby="final-heading">
-        <div class="section-header">
-          <span class="step-index" aria-hidden="true">3</span>
-          <div class="section-heading-copy">
-            <h2 id="final-heading">Finalize InvenTree BOM</h2>
-            <p>Unresolved rows must be matched or explicitly created when that option is enabled.</p>
-          </div>
-        </div>
+      <section id="final-section" class="hidden" aria-label="Finalize InvenTree BOM">
         <div class="section-body">
           <div class="actions">
             <label class="field" for="mode">Import Mode
