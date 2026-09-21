@@ -37,22 +37,23 @@
     a:hover { color:var(--action-hover); text-decoration:underline; text-underline-offset:3px; }
     a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
     button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
-    button { min-height:40px; border:1px solid var(--action); border-radius:6px; padding:8px 14px; background:var(--action); color:#fff; font-weight:600; cursor:pointer; white-space:nowrap; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
+    button,.workflow-note { min-height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:0 12px; font-family:inherit; font-size:13px; font-weight:500; line-height:1; white-space:nowrap; }
+    button { border:1px solid var(--action); background:var(--action); color:#fff; cursor:pointer; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
     button:hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); }
     button:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(16,24,40,.24); }
     button.secondary { border-color:var(--line); background:var(--surface); color:#344054; }
     button.secondary:hover:not(:disabled) { border-color:#98a2b3; background:var(--band); color:var(--ink); }
     button.danger { border-color:var(--danger); background:var(--danger); color:#fff; }
     button.danger:hover:not(:disabled) { border-color:#912018; background:#912018; }
-    button.small { min-height:34px; padding:5px 10px; font-size:13px; }
-    button.icon-button { width:32px; min-height:32px; display:grid; place-items:center; border-color:transparent; padding:0; background:transparent; color:var(--muted); font-size:20px; line-height:1; }
+    button.small { min-height:36px; padding:0 10px; font-size:13px; }
+    button.icon-button { width:36px; min-height:36px; display:grid; place-items:center; border-color:transparent; padding:0; background:transparent; color:var(--muted); font-size:20px; line-height:1; }
     button.icon-button:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
     button:disabled { opacity:.55; cursor:not-allowed; }
     input,select { min-height:42px; width:100%; border:1px solid var(--line); border-radius:6px; padding:8px 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
     input:hover,select:hover { border-color:#98a2b3; }
     input::placeholder { color:var(--subtle); }
-    input[type="file"] { padding:6px; }
-    input[type="file"]::file-selector-button { min-height:30px; margin-right:10px; border:1px solid var(--line); border-radius:5px; padding:5px 10px; background:var(--surface); color:#344054; font:inherit; font-weight:600; cursor:pointer; }
+    input[type="file"] { padding:2px 6px; }
+    input[type="file"]::file-selector-button { min-height:36px; margin-right:10px; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:var(--surface); color:#344054; font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; }
     input[type="file"]::file-selector-button:hover { background:var(--band); }
     .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
     .skip-link:focus { transform:translateY(0); }
@@ -70,27 +71,16 @@
     h1,h2,h3 { text-wrap:balance; }
     h1 { margin:0; font-size:clamp(26px,3vw,34px); line-height:1.18; letter-spacing:-.025em; }
     .page-description { max-width:720px; margin:8px 0 0; color:var(--muted); font-size:15px; line-height:1.55; text-wrap:pretty; }
-    .workflow-note { flex:none; border:1px solid var(--line-soft); border-radius:6px; padding:8px 10px; background:var(--surface); color:#475467; font-size:13px; box-shadow:var(--shadow); }
+    .page-actions { flex:none; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .workflow-note { border:1px solid var(--line); background:var(--surface); color:#344054; box-shadow:var(--shadow); }
     main { display:grid; gap:18px; }
-    section,.utility-panel { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
+    section { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
     .section-header { display:flex; align-items:flex-start; gap:12px; padding:18px 20px; border-bottom:1px solid var(--line-soft); }
     .section-heading-copy { min-width:0; }
     .section-heading-copy h2 { margin:0; font-size:18px; line-height:1.35; }
     .section-heading-copy p { margin:4px 0 0; color:var(--muted); font-size:14px; line-height:1.45; text-wrap:pretty; }
     .step-index { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action-soft); color:var(--action); font-size:13px; font-weight:700; }
-    .utility-panel { overflow:hidden; }
-    .utility-summary { align-items:center; cursor:pointer; list-style:none; user-select:none; touch-action:manipulation; }
-    .utility-summary::-webkit-details-marker { display:none; }
-    .utility-summary::after { content:"Show"; flex:none; margin-left:auto; color:var(--muted); font-size:13px; font-weight:500; }
-    .utility-panel[open] .utility-summary::after { content:"Hide"; }
-    .utility-summary:hover { background:var(--band); }
-    .utility-summary:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:-3px; }
     .section-body { padding:20px; }
-    .integration-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
-    .integration-action { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; }
-    .integration-action + .integration-action { border-left:1px solid var(--line-soft); }
-    .integration-action h3 { margin:0; font-size:15px; }
-    .integration-control { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .setup { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; }
     .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
@@ -157,10 +147,9 @@
     @media(max-width:900px) {
       .nav-shell,.page-shell { width:min(100% - 24px,1520px); }
       .page-heading { display:block; }
-      .workflow-note { display:inline-block; margin-top:14px; }
-      .setup,.integration-grid,.summary { grid-template-columns:1fr; }
-      .integration-action + .integration-action,.metric + .metric { border-left:0; border-top:1px solid var(--line-soft); }
-      .integration-action { align-items:flex-start; flex-direction:column; }
+      .page-actions { justify-content:flex-start; margin-top:14px; }
+      .setup,.summary { grid-template-columns:1fr; }
+      .metric + .metric { border-left:0; border-top:1px solid var(--line-soft); }
       .summary { display:grid; }
       .nav-shell { align-items:flex-start; padding:14px 0; }
       .nav-links { justify-content:flex-end; }
@@ -176,6 +165,9 @@
       .actions { align-items:stretch; }
       .actions .field { width:100%; min-width:0; }
       .checkbox { width:100%; }
+      .page-actions { display:grid; grid-template-columns:1fr 1fr; }
+      .page-actions button,.page-actions .workflow-note { width:100%; }
+      .page-actions .workflow-note { grid-column:1 / -1; }
       .toast-region { left:12px; right:12px; width:auto; }
       .dialog-actions.split { flex-direction:column-reverse; }
       .dialog-actions.split button { width:100%; }
@@ -209,35 +201,14 @@
         <h1>DipTrace BOM Importer</h1>
         <p class="page-description">Match a DipTrace BOM to InvenTree parts, compare local and JLCPCB availability, then publish a reviewed BOM.</p>
       </div>
-      <div class="workflow-note" aria-label="Workflow length">3-step workflow</div>
+      <div class="page-actions" role="group" aria-label="Plugin actions">
+        <button id="test-connection" class="secondary" type="button">Test Connection</button>
+        <button id="sync-stock" class="secondary" type="button">Sync External Stock</button>
+        <span class="workflow-note" aria-label="Workflow length">3-step workflow</span>
+      </div>
     </div>
 
     <main id="main-content" tabindex="-1">
-
-      <details class="utility-panel" aria-labelledby="connection-heading">
-        <summary class="section-header utility-summary">
-          <div class="section-heading-copy">
-            <h2 id="connection-heading">JLCPCB API Connection</h2>
-          </div>
-        </summary>
-        <div class="section-body">
-          <div class="integration-grid">
-            <div class="integration-action">
-              <h3>Connection Test</h3>
-              <div class="integration-control">
-                <button id="test-connection" class="secondary" type="button">Test Connection</button>
-              </div>
-            </div>
-            <div class="integration-action">
-              <h3>External Stock Sync</h3>
-              <div class="integration-control">
-                <button id="sync-stock" class="secondary" type="button">Sync External Stock</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </details>
-
       <section aria-labelledby="select-heading">
         <div class="section-header">
           <span class="step-index" aria-hidden="true">1</span>
