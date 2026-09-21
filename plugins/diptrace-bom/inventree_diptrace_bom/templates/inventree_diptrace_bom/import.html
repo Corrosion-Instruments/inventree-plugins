@@ -159,13 +159,13 @@
     .calculation-toolbar { min-height:36px; display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:8px; color:var(--muted); font-size:12px; }
     .calculation-toolbar button { min-height:30px; padding:0 9px; font-size:12px; }
     .table-wrap { max-width:100%; overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
-    table { width:100%; min-width:1330px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
+    table { width:100%; min-width:1380px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
     col.col-calc { width:58px; }
     col.col-refs { width:150px; }
     col.col-value { width:95px; }
     col.col-footprint { width:175px; }
     col.col-qty { width:50px; }
-    col.col-jlc { width:110px; }
+    col.col-jlc { width:160px; }
     col.col-match { width:275px; }
     col.col-stock { width:80px; }
     col.col-stock-wide { width:90px; }
@@ -188,7 +188,7 @@
     .calculation-toggle { width:16px; min-height:16px; height:16px; margin:0; box-shadow:none; cursor:pointer; }
     .identifier { color:#344054; font-variant-numeric:tabular-nums; white-space:nowrap; }
     .jlc-part-cell { position:relative; padding-right:40px; }
-    .jlc-part-code { overflow:hidden; display:block; text-overflow:ellipsis; white-space:nowrap; }
+    .jlc-part-code { display:block; white-space:nowrap; }
     button.copy-part-button { position:absolute; top:8px; right:6px; width:28px; min-height:28px; border-color:transparent; padding:0; background:transparent; color:var(--muted); opacity:.72; }
     button.copy-part-button:hover:not(:disabled),button.copy-part-button:focus-visible { border-color:var(--line-soft); background:var(--surface); color:var(--ink); opacity:1; }
     .part-cell { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; }
