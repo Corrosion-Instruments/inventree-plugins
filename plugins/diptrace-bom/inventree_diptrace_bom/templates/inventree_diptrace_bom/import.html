@@ -67,8 +67,7 @@
     .page-shell { padding:28px 0 48px; }
     .page-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
     h1,h2,h3 { text-wrap:balance; }
-    h1 { margin:0; font-size:clamp(26px,3vw,34px); line-height:1.18; letter-spacing:-.025em; }
-    .page-description { max-width:720px; margin:8px 0 0; color:var(--muted); font-size:15px; line-height:1.55; text-wrap:pretty; }
+    h1 { margin:0; font-size:clamp(26px,3vw,34px); font-weight:500; line-height:1.18; letter-spacing:-.025em; }
     .page-actions { flex:none; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
     .workflow-note { border:1px solid var(--line); background:var(--surface); color:#344054; box-shadow:var(--shadow); }
     main { display:grid; gap:18px; }
@@ -223,7 +222,6 @@
     <div class="page-heading">
       <div>
         <h1>DipTrace BOM Importer</h1>
-        <p class="page-description">Match a DipTrace BOM to InvenTree parts, compare local and JLCPCB availability, then publish a reviewed BOM.</p>
       </div>
       <div class="page-actions" role="group" aria-label="Plugin actions">
         <button id="test-connection" class="secondary" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v7"></path><path d="M8.5 5.5a7 7 0 1 0 7 0"></path></svg>Test Connection</button>
@@ -266,14 +264,7 @@
         </div>
       </section>
 
-      <section id="review" class="hidden" aria-labelledby="review-heading">
-        <div class="section-header">
-          <span class="step-index" aria-hidden="true">2</span>
-          <div class="section-heading-copy">
-            <h2 id="review-heading">Review &amp; Resolve</h2>
-            <p>Confirm part matches and compare quantities across local and JLCPCB inventory.</p>
-          </div>
-        </div>
+      <section id="review" class="hidden" aria-label="BOM review and resolution">
         <div class="section-body">
           <div class="summary" aria-label="BOM summary">
             <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
