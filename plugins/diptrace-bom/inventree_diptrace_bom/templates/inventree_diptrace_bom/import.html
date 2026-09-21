@@ -138,6 +138,7 @@
     .build-target-field small { color:var(--muted); font-size:12px; line-height:1.4; }
     .target-analysis { min-width:0; padding:14px; }
     .target-overview { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .target-statuses { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
     .target-filter { display:inline-flex; align-items:center; gap:2px; border:1px solid var(--line-soft); border-radius:6px; padding:2px; background:var(--band); }
     button.target-filter-button { min-height:28px; border:0; border-radius:4px; padding:0 9px; background:transparent; color:var(--muted); font-size:12px; box-shadow:none; }
     button.target-filter-button:hover:not(:disabled) { border-color:transparent; background:var(--surface); color:var(--ink); }
@@ -145,6 +146,7 @@
     .plan-status { display:inline-flex; align-items:center; min-height:28px; border-radius:999px; padding:4px 9px; background:#f2f4f7; color:#475467; font-size:12px; font-weight:600; }
     .plan-status.ready { background:var(--ok-soft); color:var(--ok); }
     .plan-status.short { background:var(--warn-soft); color:var(--warn); }
+    .plan-status.excluded { border-radius:6px; background:#f2f4f7; color:#475467; font-weight:500; }
     .shortage-list { max-height:260px; display:grid; gap:7px; overflow:auto; margin-top:12px; overscroll-behavior:contain; }
     .shortage-item { min-width:0; display:grid; grid-template-columns:minmax(230px,1.3fr) minmax(240px,1fr) auto; align-items:center; gap:12px; border-top:1px solid var(--line-soft); padding-top:8px; }
     .shortage-part { min-width:0; }
@@ -369,7 +371,10 @@
             </div>
             <div id="target-analysis" class="target-analysis hidden" aria-live="polite">
               <div class="target-overview">
-                <span id="target-combined-summary" class="plan-status"></span>
+                <div class="target-statuses">
+                  <span id="target-combined-summary" class="plan-status"></span>
+                  <span id="target-exclusion-summary" class="plan-status excluded hidden"></span>
+                </div>
                 <div class="target-filter" aria-label="Build target component filter">
                   <button id="target-filter-all" class="target-filter-button" type="button" aria-pressed="true">All</button>
                   <button id="target-filter-missing" class="target-filter-button" type="button" aria-pressed="false">Missing only</button>
@@ -468,7 +473,7 @@
     const el = Object.fromEntries([
       'assembly-query','assembly-toggle','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-local-builds','metric-external-builds','build-target','target-analysis',
-      'target-combined-summary','target-filter-all','target-filter-missing','target-shortage-list','bom-rows','final-section','mode','validate',
+      'target-combined-summary','target-exclusion-summary','target-filter-all','target-filter-missing','target-shortage-list','bom-rows','final-section','mode','validate',
       'calculation-toolbar','calculation-exclusion-count','reset-calculation-exclusions',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
@@ -926,6 +931,8 @@
       el['metric-external-builds'].textContent=externalCapacities.length ? formatStock(Math.min(...externalCapacities)) : '—';
       const excluded=state.calculationExclusions.size;
       el['calculation-toolbar'].classList.toggle('hidden',excluded === 0);
+      el['target-exclusion-summary'].classList.toggle('hidden',excluded === 0);
+      el['target-exclusion-summary'].textContent=excluded ? `${excluded} component line${excluded === 1 ? '' : 's'} excluded from calculations only` : '';
       renderCalculationExclusionBadges();
       const title=excluded ? `${excluded} BOM line${excluded === 1 ? '' : 's'} excluded from this calculation; the finalized BOM is unchanged` : '';
       el['metric-local-builds'].parentElement.title=title || 'Complete products buildable from local InvenTree stock';
