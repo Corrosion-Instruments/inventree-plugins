@@ -159,14 +159,14 @@
     .calculation-toolbar { min-height:36px; display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:8px; color:var(--muted); font-size:12px; }
     .calculation-toolbar button { min-height:30px; padding:0 9px; font-size:12px; }
     .table-wrap { max-width:100%; overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
-    table { width:100%; min-width:1480px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
+    table { width:100%; min-width:1330px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
     col.col-calc { width:58px; }
     col.col-refs { width:150px; }
     col.col-value { width:95px; }
     col.col-footprint { width:175px; }
     col.col-qty { width:50px; }
     col.col-jlc { width:110px; }
-    col.col-match { width:395px; }
+    col.col-match { width:275px; }
     col.col-stock { width:80px; }
     col.col-stock-wide { width:90px; }
     th,td { border-bottom:1px solid #e3e6eb; border-right:1px solid #e8eaee; padding:11px 10px; text-align:left; vertical-align:middle; }
@@ -189,6 +189,7 @@
     .calculation-toggle { width:16px; min-height:16px; height:16px; margin:0; box-shadow:none; cursor:pointer; }
     .identifier { color:#344054; font-variant-numeric:tabular-nums; white-space:nowrap; }
     .part-cell { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; }
+    button.part-search-button { width:36px; min-height:36px; padding:0; }
     .status { display:inline-block; margin-top:6px; border-radius:999px; padding:3px 8px; background:#f2f4f7; color:#475467; font-size:11px; line-height:1.35; }
     .status.matched { color:var(--ok); background:var(--ok-soft); }
     .status.unmatched,.status.ambiguous { color:var(--warn); background:var(--warn-soft); }
@@ -240,8 +241,8 @@
       .nav-links a { padding:7px 8px; }
       .page-shell { padding-top:20px; }
       .section-body { padding:16px; }
-      .row,.part-cell { grid-template-columns:1fr; }
-      .row button,.part-cell button,.actions > button { width:100%; }
+      .row { grid-template-columns:1fr; }
+      .row button,.actions > button { width:100%; }
       .actions { align-items:stretch; }
       .actions .field { width:100%; min-width:0; }
       .finalize-controls,.finalize-row { width:100%; }
@@ -360,14 +361,13 @@
             <table>
               <caption class="visually-hidden">DipTrace BOM lines with InvenTree matches and stock availability</caption>
               <colgroup>
-                <col class="col-calc">
-                <col class="col-refs"><col class="col-value"><col class="col-footprint"><col class="col-qty"><col class="col-jlc"><col class="col-match">
-                <col class="col-stock"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide">
+                <col class="col-jlc"><col class="col-match"><col class="col-stock"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide">
+                <col class="col-footprint"><col class="col-refs"><col class="col-value"><col class="col-qty"><col class="col-calc">
               </colgroup>
               <thead><tr>
-                <th class="calculation-cell" scope="col" aria-label="Include in build calculations" title="Include this component in build-capacity and target calculations">Use</th><th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th scope="col">Footprint</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th>
-                <th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th><th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local InvenTree stock">Local Builds</th>
-                <th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th><th class="numeric" scope="col" aria-label="Assemblies buildable from JLCPCB stock and My Inventory" title="Floor of (JLC Stock + My Inventory) divided by required quantity">External Builds</th>
+                <th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th><th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th>
+                <th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local InvenTree stock">Local Builds</th><th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th><th class="numeric" scope="col" aria-label="Assemblies buildable from JLCPCB stock and My Inventory" title="Floor of (JLC Stock + My Inventory) divided by required quantity">External Builds</th>
+                <th scope="col">Footprint</th><th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th class="calculation-cell" scope="col" aria-label="Include in build calculations" title="Include this component in build-capacity and target calculations">Use</th>
               </tr></thead>
               <tbody id="bom-rows"></tbody>
             </table>
@@ -779,6 +779,12 @@
     }
     function renderRow(row) {
       const tr = document.createElement('tr'); tr.dataset.row = row.row;
+      const textCell=(value,{numeric=false,identifier=false}={})=>{
+        const td=document.createElement('td'); td.textContent=value || value === 0 ? value : '—';
+        if (numeric) td.classList.add('numeric');
+        if (identifier) { td.classList.add('identifier'); td.setAttribute('translate','no'); }
+        return td;
+      };
       const calculationTd=document.createElement('td'); calculationTd.className='calculation-cell';
       const calculationToggle=document.createElement('input'); calculationToggle.type='checkbox'; calculationToggle.checked=true; calculationToggle.className='calculation-toggle';
       calculationToggle.setAttribute('aria-label', `Include ${row.designators || `BOM row ${row.row}`} in build calculations`);
@@ -790,20 +796,16 @@
         tr.title=calculationToggle.checked ? '' : 'Excluded from build calculations only; remains in the BOM';
         updateBuildCalculations();
       });
-      calculationTd.appendChild(calculationToggle); tr.appendChild(calculationTd);
-      for (const [index,value] of [row.designators,row.comment,row.footprint,row.quantity,row.jlcpcb_part].entries()) {
-        const td = document.createElement('td'); td.textContent = value || '—';
-        if (index === 3) td.classList.add('numeric');
-        if (index === 4) { td.classList.add('identifier'); td.setAttribute('translate','no'); }
-        tr.appendChild(td);
-      }
+      calculationTd.appendChild(calculationToggle);
+      tr.appendChild(textCell(row.jlcpcb_part,{identifier:true}));
       const partTd = document.createElement('td'); const wrap = document.createElement('div'); wrap.className = 'part-cell';
       const select = document.createElement('select'); select.className = 'part-selection'; select.dataset.row = row.row;
       select.name = `part_selection_${row.row}`;
       select.setAttribute('aria-label', `InvenTree part for ${row.designators || `BOM row ${row.row}`}`);
       const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Unresolved'; select.appendChild(blank);
       addPartOption(select, row.match.part, true); for (const candidate of row.match.candidates || []) addPartOption(select, candidate, false);
-      const find = document.createElement('button'); find.type='button'; find.className='secondary small'; find.textContent='Search';
+      const find = document.createElement('button'); find.type='button'; find.className='secondary small part-search-button';
+      find.innerHTML='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>';
       find.title='Search all InvenTree parts';
       find.setAttribute('aria-label', `Search InvenTree parts for ${row.designators || `BOM row ${row.row}`}`);
       find.addEventListener('click', () => openPartDialog(row.row)); wrap.append(select,find); partTd.appendChild(wrap);
@@ -832,6 +834,11 @@
       externalBuildsTd.title=`JLC Stock ${formatStock(publicStock)} + My Inventory ${formatStock(inventoryTotal)}; ${formatStock(requiredQuantity)} required per assembly`;
       externalBuildsTd.setAttribute('aria-label', `${formatStock(externalBuilds)} external builds from JLC Stock ${formatStock(publicStock)} plus My Inventory ${formatStock(inventoryTotal)}, with ${formatStock(requiredQuantity)} required per assembly`);
       tr.appendChild(externalBuildsTd);
+      tr.appendChild(textCell(row.footprint));
+      tr.appendChild(textCell(row.designators));
+      tr.appendChild(textCell(row.comment));
+      tr.appendChild(textCell(row.quantity,{numeric:true}));
+      tr.appendChild(calculationTd);
       return tr;
     }
     function privateInventoryBuckets(jlc) {
