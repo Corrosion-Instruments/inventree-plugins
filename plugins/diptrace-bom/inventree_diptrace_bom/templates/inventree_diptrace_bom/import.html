@@ -247,7 +247,6 @@
                     </div>
                     <button id="assembly-toggle" class="combobox-toggle" type="button" aria-label="Show assembly options" aria-controls="assembly-options" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button>
                   </div>
-                  <input id="assembly" name="assembly" type="hidden">
                   <div id="assembly-options" class="combobox-options hidden" role="listbox" aria-label="Assemblies"></div>
                 </div>
                 <span id="assembly-status" class="combobox-status" aria-live="polite">Loading assemblies…</span>
@@ -366,7 +365,7 @@
   <script>
     const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false };
     const el = Object.fromEntries([
-      'assembly-query','assembly-toggle','assembly','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
+      'assembly-query','assembly-toggle','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
@@ -555,7 +554,6 @@
       const id = String(part.pk);
       state.assemblySelectionLock = true;
       state.selectedAssemblyId = id;
-      el.assembly.value = id;
       el['assembly-query'].value = text;
       state.selectedAssemblyText = text;
       el['assembly-status'].textContent = `${part.label || part.name || 'Assembly'} selected.`;
@@ -596,7 +594,7 @@
         option.dataset.pk = String(part.pk);
         option.tabIndex = -1;
         option.setAttribute('role', 'option');
-        option.setAttribute('aria-selected', String(String(part.pk) === el.assembly.value));
+        option.setAttribute('aria-selected', String(String(part.pk) === state.selectedAssemblyId));
         const name = document.createElement('strong');
         name.textContent = part.label || part.name || `Assembly ${part.pk}`;
         const detail = document.createElement('small');
@@ -627,7 +625,7 @@
       state.assemblySearchTimer = window.setTimeout(() => searchAssemblies(true).catch(error => showError(error, 'Assembly Search Failed')), 250);
     }
     async function preview() {
-      const assemblyId = state.selectedAssemblyId || el.assembly.value;
+      const assemblyId = state.selectedAssemblyId;
       if (!assemblyId) throw new Error('Select an assembly / finished product');
       const file = el['bom-file'].files[0]; if (!file) throw new Error('Select a DipTrace BOM file');
       const form = new FormData(); form.append('file', file); form.append('assembly_id', assemblyId);
@@ -757,7 +755,7 @@
       el.finalize.setAttribute('aria-busy', 'true');
       showLoading('Finalizing BOM…', 'Saving the reviewed component matches to InvenTree.');
       try {
-        const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:state.selectedAssemblyId || el.assembly.value,selections,
+        const result=await postJson('finalize/', {preview_token:state.preview.preview_token,assembly_id:state.selectedAssemblyId,selections,
           mode:el.mode.value,validate:el.validate.checked,create_missing:el['create-missing'].checked});
         notify(`BOM finalized: ${result.created} created, ${result.updated} updated, ${result.deleted} removed. Can build locally: ${result.can_build}.`, 'success', 'BOM Finalized', {label:'Open InvenTree BOM',href:result.bom_url});
         state.preview = null;
@@ -772,7 +770,6 @@
     el['assembly-query'].addEventListener('input', () => {
       if (state.assemblySelectionLock) return;
       if (el['assembly-query'].value !== state.selectedAssemblyText) {
-        el.assembly.value = '';
         state.selectedAssemblyText = '';
         state.selectedAssemblyId = '';
       }
