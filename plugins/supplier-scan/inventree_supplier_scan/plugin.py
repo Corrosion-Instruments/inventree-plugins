@@ -46,7 +46,7 @@ class SupplierScanPlugin(
     SLUG = "supplier-scan"
     TITLE = "Supplier Scan"
     DESCRIPTION = "Scan LCSC/JLC and DigiKey supplier barcodes to create parts and receive stock"
-    VERSION = "0.1.0"
+    VERSION = "0.1.1"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.3.0"
 
@@ -274,7 +274,7 @@ class SupplierScanPlugin(
                 "description": _("Scan LCSC/JLC and DigiKey labels into stock"),
                 "icon": "ti:barcode",
                 "source": self.plugin_static_file("supplier_scan_dashboard.js"),
-                "options": {"width": 3, "height": 2},
+                "options": {"width": 3, "height": 3},
                 "context": {"url": f"/plugin/{self.SLUG}/"},
             }
         ]
