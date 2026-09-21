@@ -138,12 +138,16 @@
     .build-target-field input { width:150px; font-size:13px; font-weight:500; font-variant-numeric:tabular-nums; }
     .build-target-field small { color:var(--muted); font-size:12px; line-height:1.4; }
     .target-analysis { min-width:0; padding:14px; }
-    .target-overview { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .target-overview { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .target-filter { display:inline-flex; align-items:center; gap:2px; border:1px solid var(--line-soft); border-radius:6px; padding:2px; background:var(--band); }
+    button.target-filter-button { min-height:28px; border:0; border-radius:4px; padding:0 9px; background:transparent; color:var(--muted); font-size:12px; box-shadow:none; }
+    button.target-filter-button:hover:not(:disabled) { border-color:transparent; background:var(--surface); color:var(--ink); }
+    button.target-filter-button[aria-pressed="true"] { background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(16,24,40,.08); }
     .plan-status { display:inline-flex; align-items:center; min-height:28px; border-radius:999px; padding:4px 9px; background:#f2f4f7; color:#475467; font-size:12px; font-weight:600; }
     .plan-status.ready { background:var(--ok-soft); color:var(--ok); }
     .plan-status.short { background:var(--warn-soft); color:var(--warn); }
     .shortage-list { max-height:260px; display:grid; gap:7px; overflow:auto; margin-top:12px; overscroll-behavior:contain; }
-    .shortage-item { min-width:0; display:grid; grid-template-columns:minmax(230px,1.3fr) repeat(2,minmax(170px,1fr)); align-items:center; gap:12px; border-top:1px solid var(--line-soft); padding-top:8px; }
+    .shortage-item { min-width:0; display:grid; grid-template-columns:minmax(230px,1.3fr) minmax(240px,1fr); align-items:center; gap:12px; border-top:1px solid var(--line-soft); padding-top:8px; }
     .shortage-part { min-width:0; }
     .shortage-part strong,.shortage-part small { display:block; overflow-wrap:anywhere; }
     .shortage-part strong { font-size:13px; font-weight:600; }
@@ -331,8 +335,11 @@
             </div>
             <div id="target-analysis" class="target-analysis hidden" aria-live="polite">
               <div class="target-overview">
-                <span id="target-local-summary" class="plan-status"></span>
-                <span id="target-external-summary" class="plan-status"></span>
+                <span id="target-combined-summary" class="plan-status"></span>
+                <div class="target-filter" aria-label="Build target component filter">
+                  <button id="target-filter-all" class="target-filter-button" type="button" aria-pressed="true">All</button>
+                  <button id="target-filter-missing" class="target-filter-button" type="button" aria-pressed="false">Missing only</button>
+                </div>
               </div>
               <div id="target-shortage-list" class="shortage-list"></div>
             </div>
@@ -421,11 +428,11 @@
   </dialog>
 
   <script>
-    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false };
+    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false, targetFilter: 'all' };
     const el = Object.fromEntries([
       'assembly-query','assembly-toggle','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-local-builds','metric-external-builds','build-target','target-analysis',
-      'target-local-summary','target-external-summary','target-shortage-list','bom-rows','final-section','mode','validate',
+      'target-combined-summary','target-filter-all','target-filter-missing','target-shortage-list','bom-rows','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
       'confirm-dialog','confirm-cancel','confirm-accept'
@@ -817,42 +824,49 @@
       document.querySelectorAll('#bom-rows tr').forEach(row => row.classList.remove('target-shortage'));
       const target=Number(el['build-target'].value);
       if (!state.preview || !Number.isInteger(target) || target < 1) { el['target-analysis'].classList.add('hidden'); return; }
-      const shortages=state.preview.rows.map(row => {
+      const coverage=state.preview.rows.map(row => {
         const required=stockNumber(row.quantity) * target;
         const localAvailable=stockNumber(row.local.available);
         const myInventory=privateInventoryBuckets(row.jlc).reduce((total,[,value]) => total + value,0);
         const externalAvailable=stockNumber(row.jlc.public_stock) + myInventory;
-        return {row,required,localAvailable,externalAvailable,localShort:Math.max(required-localAvailable,0),externalShort:Math.max(required-externalAvailable,0)};
+        const combinedAvailable=localAvailable + externalAvailable;
+        return {row,required,localAvailable,externalAvailable,combinedAvailable,shortage:Math.max(required-combinedAvailable,0)};
       });
-      const localBlocking=shortages.filter(item => item.localShort > 0);
-      const externalBlocking=shortages.filter(item => item.externalShort > 0);
-      setPlanStatus(el['target-local-summary'],'Local',target,localBlocking.length);
-      setPlanStatus(el['target-external-summary'],'External',target,externalBlocking.length);
+      const blocking=coverage.filter(item => item.shortage > 0);
+      setPlanStatus(el['target-combined-summary'],'All sources',target,blocking.length);
+      const visible=state.targetFilter === 'missing' ? blocking : coverage;
       el['target-shortage-list'].innerHTML='';
-      const blocking=shortages.filter(item => item.localShort > 0 || item.externalShort > 0);
-      for (const item of blocking) {
-        document.querySelector(`#bom-rows tr[data-row="${item.row.row}"]`)?.classList.add('target-shortage');
+      for (const item of blocking) document.querySelector(`#bom-rows tr[data-row="${item.row.row}"]`)?.classList.add('target-shortage');
+      for (const item of visible) {
         const card=document.createElement('div'); card.className='shortage-item';
         const part=document.createElement('div'); part.className='shortage-part';
         const name=document.createElement('strong'); name.textContent=[item.row.designators,item.row.comment || item.row.footprint].filter(Boolean).join(' · ') || `BOM row ${item.row.row}`;
         const need=document.createElement('small'); need.textContent=`Need ${formatStock(item.required)} for ${formatStock(target)} builds · ${item.row.jlcpcb_part || 'No JLC part'}`; part.append(name,need);
-        card.append(part,shortageSource('Local',item.localAvailable,item.required,item.localShort),shortageSource('External',item.externalAvailable,item.required,item.externalShort));
+        card.append(part,coverageSource(item));
         el['target-shortage-list'].appendChild(card);
       }
-      if (!blocking.length) { const ready=document.createElement('div'); ready.className='shortage-source'; ready.textContent=`Every BOM line has enough stock for ${formatStock(target)} builds.`; el['target-shortage-list'].appendChild(ready); }
+      if (!visible.length) { const ready=document.createElement('div'); ready.className='shortage-source'; ready.textContent=blocking.length ? 'No components match this filter.' : `Every BOM line has enough stock for ${formatStock(target)} builds.`; el['target-shortage-list'].appendChild(ready); }
       el['target-analysis'].classList.remove('hidden');
     }
     function setPlanStatus(element,label,target,blockingCount) {
       element.className=`plan-status ${blockingCount ? 'short' : 'ready'}`;
       element.textContent=blockingCount ? `${label}: ${blockingCount} component line${blockingCount === 1 ? '' : 's'} short` : `${label}: ready for ${formatStock(target)}`;
     }
-    function shortageSource(label,available,required,shortage) {
-      const source=document.createElement('div'); source.className=`shortage-source ${shortage > 0 ? 'missing' : ''}`;
-      const heading=document.createElement('strong'); heading.textContent=label;
+    function setTargetFilter(filter) {
+      state.targetFilter=filter;
+      el['target-filter-all'].setAttribute('aria-pressed',String(filter === 'all'));
+      el['target-filter-missing'].setAttribute('aria-pressed',String(filter === 'missing'));
+      updateTargetAnalysis();
+    }
+    function coverageSource(item) {
+      const source=document.createElement('div'); source.className=`shortage-source ${item.shortage > 0 ? 'missing' : ''}`;
+      const heading=document.createElement('strong'); heading.textContent=item.shortage > 0 ? 'Missing' : 'Covered';
       const detail=document.createElement('span');
-      if (shortage <= 0) detail.textContent=`Ready · ${formatStock(available)} available`;
-      else if (available <= 0) detail.textContent=`Missing all ${formatStock(required)} · 0 available`;
-      else detail.textContent=`${formatStock(shortage)} short · ${formatStock(available)} available`;
+      if (item.shortage > 0 && item.combinedAvailable <= 0) detail.textContent=`Missing all ${formatStock(item.required)} · 0 available`;
+      else if (item.shortage > 0) detail.textContent=`${formatStock(item.shortage)} short · ${formatStock(item.combinedAvailable)} available across all sources`;
+      else if (item.localAvailable >= item.required) detail.textContent=`Ready from local stock · ${formatStock(item.localAvailable)} available`;
+      else if (item.externalAvailable >= item.required) detail.textContent=`Ready from external stock · ${formatStock(item.externalAvailable)} available`;
+      else detail.textContent=`Ready using local + external · ${formatStock(item.combinedAvailable)} combined`;
       source.append(heading,detail); return source;
     }
     function stockNumber(value) { const number=Number(value ?? 0); return Number.isFinite(number) ? number : 0; }
@@ -954,6 +968,8 @@
     });
     el.preview.addEventListener('click',()=>preview().catch(error=>showError(error, 'BOM Preview Failed')));
     el['build-target'].addEventListener('input',updateTargetAnalysis);
+    el['target-filter-all'].addEventListener('click',()=>setTargetFilter('all'));
+    el['target-filter-missing'].addEventListener('click',()=>setTargetFilter('missing'));
     el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>showError(error, 'Connection Test Failed')));
     el['sync-stock'].addEventListener('click',()=>syncStock().catch(error=>showError(error, 'Stock Sync Failed')));
     el['part-search'].addEventListener('click',()=>searchParts().catch(error=>showError(error, 'Part Search Failed')));
