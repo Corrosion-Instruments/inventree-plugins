@@ -133,16 +133,30 @@
     .metric span { display:block; color:var(--muted); font-size:12px; }
     .metric strong { display:block; margin-top:4px; font-size:18px; line-height:1.3; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
     .table-wrap { max-width:100%; overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
-    table { width:100%; min-width:1450px; border-collapse:separate; border-spacing:0; font-size:13px; }
-    th,td { border-bottom:1px solid var(--line-soft); border-right:1px solid var(--line-soft); padding:10px; text-align:left; vertical-align:top; }
+    table { width:100%; min-width:1415px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
+    col.col-refs { width:150px; }
+    col.col-value { width:95px; }
+    col.col-footprint { width:175px; }
+    col.col-qty { width:50px; }
+    col.col-jlc { width:110px; }
+    col.col-match { width:395px; }
+    col.col-stock { width:80px; }
+    col.col-stock-wide { width:90px; }
+    th,td { border-bottom:1px solid #e3e6eb; border-right:1px solid #e8eaee; padding:11px 10px; text-align:left; vertical-align:middle; }
     th:last-child,td:last-child { border-right:0; }
     tbody tr:last-child td { border-bottom:0; }
-    tbody tr:hover td { background:#fcfcfd; }
+    tbody tr:nth-child(odd) td { background:#fff; }
+    tbody tr:nth-child(even) td { background:#f7f8fa; }
+    tbody tr:hover td { background:#eef3f8; }
     tbody tr { content-visibility:auto; contain-intrinsic-size:48px; }
-    th { position:sticky; top:0; z-index:2; background:#f2f4f7; color:#475467; font-size:12px; font-weight:700; letter-spacing:.01em; }
-    td select { min-width:260px; min-height:36px; padding:5px 8px; }
+    th { position:sticky; top:0; z-index:2; border-bottom-color:#cfd4dc; padding-top:12px; padding-bottom:12px; background:#eef0f3; color:#344054; font-size:13px; font-weight:600; line-height:1.2; letter-spacing:0; white-space:nowrap; box-shadow:inset 0 -1px 0 rgba(16,24,40,.04); }
+    th[title] { cursor:help; }
+    td { color:#253044; line-height:1.4; }
+    td:first-child { font-weight:500; }
+    td select { min-width:0; min-height:36px; padding:5px 30px 5px 9px; font-size:13px; font-weight:400; }
     td.numeric,th.numeric { text-align:right; font-variant-numeric:tabular-nums; }
-    .part-cell { display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:7px; }
+    .identifier { color:#344054; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .part-cell { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; }
     .status { display:inline-block; margin-top:6px; border-radius:999px; padding:3px 8px; background:#f2f4f7; color:#475467; font-size:11px; line-height:1.35; }
     .status.matched { color:var(--ok); background:var(--ok-soft); }
     .status.unmatched,.status.ambiguous { color:var(--warn); background:var(--warn-soft); }
@@ -281,10 +295,14 @@
           <div class="table-wrap" tabindex="0" aria-label="Scrollable BOM review table">
             <table>
               <caption class="visually-hidden">DipTrace BOM lines with InvenTree matches and stock availability</caption>
+              <colgroup>
+                <col class="col-refs"><col class="col-value"><col class="col-footprint"><col class="col-qty"><col class="col-jlc"><col class="col-match">
+                <col class="col-stock"><col class="col-stock"><col class="col-stock-wide"><col class="col-stock"><col class="col-stock"><col class="col-stock">
+              </colgroup>
               <thead><tr>
-                <th scope="col">References</th><th scope="col">Value / Comment</th><th scope="col">Footprint</th><th class="numeric" scope="col">Qty</th><th scope="col">JLC #</th>
-                <th scope="col">InvenTree Part</th><th class="numeric" scope="col">Local Available</th><th class="numeric" scope="col">Line Can Build</th>
-                <th class="numeric" scope="col">JLC Public</th><th class="numeric" scope="col">My Parts Total</th><th class="numeric" scope="col">Global Sourcing</th><th class="numeric" scope="col">Consigned</th>
+                <th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th scope="col">Footprint</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th>
+                <th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th><th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local stock">Builds</th>
+                <th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="All stock in the JLCPCB My Parts library" title="All stock in your JLCPCB My Parts library">My Parts</th><th class="numeric" scope="col" aria-label="JLCPCB global sourcing reserved stock" title="JLCPCB global sourcing reserved stock">Global</th><th class="numeric" scope="col" aria-label="Consigned stock held by JLCPCB" title="Your consigned stock held by JLCPCB">Consigned</th>
               </tr></thead>
               <tbody id="bom-rows"></tbody>
             </table>
@@ -689,8 +707,11 @@
     }
     function renderRow(row) {
       const tr = document.createElement('tr'); tr.dataset.row = row.row;
-      for (const value of [row.designators,row.comment,row.footprint,row.quantity,row.jlcpcb_part]) {
-        const td = document.createElement('td'); td.textContent = value || '—'; tr.appendChild(td);
+      for (const [index,value] of [row.designators,row.comment,row.footprint,row.quantity,row.jlcpcb_part].entries()) {
+        const td = document.createElement('td'); td.textContent = value || '—';
+        if (index === 3) td.classList.add('numeric');
+        if (index === 4) { td.classList.add('identifier'); td.setAttribute('translate','no'); }
+        tr.appendChild(td);
       }
       const partTd = document.createElement('td'); const wrap = document.createElement('div'); wrap.className = 'part-cell';
       const select = document.createElement('select'); select.className = 'part-selection'; select.dataset.row = row.row;
@@ -698,10 +719,14 @@
       select.setAttribute('aria-label', `InvenTree part for ${row.designators || `BOM row ${row.row}`}`);
       const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Unresolved'; select.appendChild(blank);
       addPartOption(select, row.match.part, true); for (const candidate of row.match.candidates || []) addPartOption(select, candidate, false);
-      const find = document.createElement('button'); find.type='button'; find.className='secondary small'; find.textContent='Find';
-      find.setAttribute('aria-label', `Find an InvenTree part for ${row.designators || `BOM row ${row.row}`}`);
+      const find = document.createElement('button'); find.type='button'; find.className='secondary small'; find.textContent='Search';
+      find.title='Search all InvenTree parts';
+      find.setAttribute('aria-label', `Search InvenTree parts for ${row.designators || `BOM row ${row.row}`}`);
       find.addEventListener('click', () => openPartDialog(row.row)); wrap.append(select,find); partTd.appendChild(wrap);
-      const badge = document.createElement('span'); badge.className=`status ${row.match.status}`; badge.textContent=row.match.reason; partTd.appendChild(badge); tr.appendChild(partTd);
+      const status = document.createElement('span'); status.id=`match-status-${row.row}`; status.textContent=`Match status: ${row.match.reason}`;
+      select.setAttribute('aria-describedby', status.id); select.title=row.match.reason;
+      if (row.match.status === 'matched') status.className='visually-hidden'; else status.className=`status ${row.match.status}`;
+      partTd.appendChild(status); tr.appendChild(partTd);
       for (const value of [row.local.available,row.local.can_build,row.jlc.public_stock,row.jlc.private_total,row.jlc.global_sourcing,row.jlc.consigned]) {
         const td=document.createElement('td'); td.classList.add('numeric'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
       }
