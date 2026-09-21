@@ -133,7 +133,7 @@
     .metric span { display:block; color:var(--muted); font-size:12px; }
     .metric strong { display:block; margin-top:4px; font-size:18px; line-height:1.3; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
     .table-wrap { max-width:100%; overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
-    table { width:100%; min-width:1330px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
+    table { width:100%; min-width:1420px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
     col.col-refs { width:150px; }
     col.col-value { width:95px; }
     col.col-footprint { width:175px; }
@@ -304,12 +304,12 @@
               <caption class="visually-hidden">DipTrace BOM lines with InvenTree matches and stock availability</caption>
               <colgroup>
                 <col class="col-refs"><col class="col-value"><col class="col-footprint"><col class="col-qty"><col class="col-jlc"><col class="col-match">
-                <col class="col-stock"><col class="col-stock"><col class="col-stock-wide"><col class="col-stock-wide">
+                <col class="col-stock"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide">
               </colgroup>
               <thead><tr>
                 <th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th scope="col">Footprint</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th>
-                <th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th><th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local stock">Builds</th>
-                <th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th>
+                <th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th><th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local InvenTree stock">Local Builds</th>
+                <th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th><th class="numeric" scope="col" aria-label="Assemblies buildable from JLCPCB stock and My Inventory" title="Floor of (JLC Stock + My Inventory) divided by required quantity">External Builds</th>
               </tr></thead>
               <tbody id="bom-rows"></tbody>
             </table>
@@ -751,6 +751,15 @@
       const tooltipTitle = document.createElement('strong'); tooltipTitle.textContent='My Inventory Breakdown'; tooltip.appendChild(tooltipTitle);
       for (const [label,value] of inventoryBuckets) { const line=document.createElement('span'); const name=document.createElement('span'); name.textContent=label; const amount=document.createElement('b'); amount.textContent=formatStock(value); line.append(name,amount); tooltip.appendChild(line); }
       breakdown.append(total,tooltip); inventoryTd.appendChild(breakdown); tr.appendChild(inventoryTd);
+      const requiredQuantity = stockNumber(row.quantity);
+      const publicStock = stockNumber(row.jlc.public_stock);
+      const externalAvailable = publicStock + inventoryTotal;
+      const externalBuilds = requiredQuantity > 0 ? Math.floor(externalAvailable / requiredQuantity) : 0;
+      const externalBuildsTd = document.createElement('td'); externalBuildsTd.className='numeric'; if (externalBuilds === 0) externalBuildsTd.classList.add('zero');
+      externalBuildsTd.textContent=formatStock(externalBuilds);
+      externalBuildsTd.title=`JLC Stock ${formatStock(publicStock)} + My Inventory ${formatStock(inventoryTotal)}; ${formatStock(requiredQuantity)} required per assembly`;
+      externalBuildsTd.setAttribute('aria-label', `${formatStock(externalBuilds)} external builds from JLC Stock ${formatStock(publicStock)} plus My Inventory ${formatStock(inventoryTotal)}, with ${formatStock(requiredQuantity)} required per assembly`);
+      tr.appendChild(externalBuildsTd);
       return tr;
     }
     function stockNumber(value) { const number=Number(value ?? 0); return Number.isFinite(number) ? number : 0; }
