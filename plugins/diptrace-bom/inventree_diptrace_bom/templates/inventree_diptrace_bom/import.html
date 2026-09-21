@@ -127,7 +127,7 @@
     .toast-action { display:inline-block; margin-top:8px; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
     @keyframes toast-in { from { opacity:0; transform:translateY(-8px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(.98); } }
-    .summary { display:grid; grid-template-columns:1.4fr repeat(4,1fr); margin-bottom:16px; border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
+    .summary { display:grid; grid-template-columns:1.4fr repeat(5,1fr); margin-bottom:16px; border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
     .metric { min-width:0; padding:13px 14px; background:var(--band); }
     .metric + .metric { border-left:1px solid var(--line-soft); }
     .metric span { display:block; color:var(--muted); font-size:12px; }
@@ -297,7 +297,8 @@
             <div class="metric"><span>BOM Lines</span><strong id="metric-lines">0</strong></div>
             <div class="metric"><span>Matched</span><strong id="metric-matched">0</strong></div>
             <div class="metric"><span>Unresolved</span><strong id="metric-unresolved">0</strong></div>
-            <div class="metric"><span>Can Build Locally</span><strong id="metric-can-build">0</strong></div>
+            <div class="metric" title="Complete products buildable from local InvenTree stock"><span>Local BOM Builds</span><strong id="metric-local-builds">0</strong></div>
+            <div class="metric" title="Complete products buildable from JLC Stock plus My Inventory"><span>External BOM Builds</span><strong id="metric-external-builds">0</strong></div>
           </div>
           <div class="table-wrap" tabindex="0" aria-label="Scrollable BOM review table">
             <table>
@@ -386,7 +387,7 @@
     const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false };
     const el = Object.fromEntries([
       'assembly-query','assembly-toggle','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
-      'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
+      'metric-matched','metric-unresolved','metric-local-builds','metric-external-builds','bom-rows','final-section','mode','validate',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
       'confirm-dialog','confirm-cancel','confirm-accept'
@@ -705,7 +706,11 @@
       const data = state.preview; const summary = data.summary;
       el['metric-file'].textContent = data.filename; el['metric-lines'].textContent = summary.line_count;
       el['metric-matched'].textContent = summary.matched; el['metric-unresolved'].textContent = summary.unresolved;
-      el['metric-can-build'].textContent = summary.can_build; el['bom-rows'].innerHTML = '';
+      const externalCapacities = data.rows.map(externalBuildCapacity);
+      const externalBomBuilds = externalCapacities.length ? Math.min(...externalCapacities) : 0;
+      el['metric-local-builds'].textContent = summary.can_build;
+      el['metric-external-builds'].textContent = formatStock(externalBomBuilds);
+      el['bom-rows'].innerHTML = '';
       for (const row of data.rows) el['bom-rows'].appendChild(renderRow(row));
       el.review.classList.remove('hidden'); el['final-section'].classList.remove('hidden');
       el['create-missing-wrap'].classList.toggle('hidden', !data.settings.allow_create_missing);
@@ -737,11 +742,7 @@
       for (const value of [row.local.available,row.local.can_build,row.jlc.public_stock]) {
         const td=document.createElement('td'); td.classList.add('numeric'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
       }
-      const inventoryBuckets = [
-        ['JLCPCB Private Parts', stockNumber(row.jlc.jlcpcb_parts)],
-        ['Global Sourcing', stockNumber(row.jlc.global_sourcing)],
-        ['Consigned', stockNumber(row.jlc.consigned)],
-      ];
+      const inventoryBuckets = privateInventoryBuckets(row.jlc);
       const inventoryTotal = inventoryBuckets.reduce((total, [, value]) => total + value, 0);
       const inventoryTd = document.createElement('td'); inventoryTd.className='numeric'; if (inventoryTotal === 0) inventoryTd.classList.add('zero');
       const breakdown = document.createElement('span'); breakdown.className='inventory-breakdown'; breakdown.tabIndex=0;
@@ -751,16 +752,27 @@
       const tooltipTitle = document.createElement('strong'); tooltipTitle.textContent='My Inventory Breakdown'; tooltip.appendChild(tooltipTitle);
       for (const [label,value] of inventoryBuckets) { const line=document.createElement('span'); const name=document.createElement('span'); name.textContent=label; const amount=document.createElement('b'); amount.textContent=formatStock(value); line.append(name,amount); tooltip.appendChild(line); }
       breakdown.append(total,tooltip); inventoryTd.appendChild(breakdown); tr.appendChild(inventoryTd);
-      const requiredQuantity = stockNumber(row.quantity);
       const publicStock = stockNumber(row.jlc.public_stock);
-      const externalAvailable = publicStock + inventoryTotal;
-      const externalBuilds = requiredQuantity > 0 ? Math.floor(externalAvailable / requiredQuantity) : 0;
+      const requiredQuantity = stockNumber(row.quantity);
+      const externalBuilds = externalBuildCapacity(row);
       const externalBuildsTd = document.createElement('td'); externalBuildsTd.className='numeric'; if (externalBuilds === 0) externalBuildsTd.classList.add('zero');
       externalBuildsTd.textContent=formatStock(externalBuilds);
       externalBuildsTd.title=`JLC Stock ${formatStock(publicStock)} + My Inventory ${formatStock(inventoryTotal)}; ${formatStock(requiredQuantity)} required per assembly`;
       externalBuildsTd.setAttribute('aria-label', `${formatStock(externalBuilds)} external builds from JLC Stock ${formatStock(publicStock)} plus My Inventory ${formatStock(inventoryTotal)}, with ${formatStock(requiredQuantity)} required per assembly`);
       tr.appendChild(externalBuildsTd);
       return tr;
+    }
+    function privateInventoryBuckets(jlc) {
+      return [
+        ['JLCPCB Private Parts', stockNumber(jlc.jlcpcb_parts)],
+        ['Global Sourcing', stockNumber(jlc.global_sourcing)],
+        ['Consigned', stockNumber(jlc.consigned)],
+      ];
+    }
+    function externalBuildCapacity(row) {
+      const requiredQuantity=stockNumber(row.quantity); if (requiredQuantity <= 0) return 0;
+      const myInventory=privateInventoryBuckets(row.jlc).reduce((total,[,value]) => total + value,0);
+      return Math.floor((stockNumber(row.jlc.public_stock) + myInventory) / requiredQuantity);
     }
     function stockNumber(value) { const number=Number(value ?? 0); return Number.isFinite(number) ? number : 0; }
     function formatStock(value) { return new Intl.NumberFormat(undefined,{maximumFractionDigits:4}).format(value); }
