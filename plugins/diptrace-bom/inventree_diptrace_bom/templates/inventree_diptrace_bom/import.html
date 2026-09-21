@@ -71,10 +71,11 @@
     .page-actions { flex:none; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
     .workflow-note { border:1px solid var(--line); background:var(--surface); color:#344054; box-shadow:var(--shadow); }
     main { display:grid; gap:18px; }
-    section { scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
+    section { position:relative; scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
+    .step-marker { position:absolute; top:-10px; left:16px; z-index:3; min-height:20px; display:inline-flex; align-items:center; border:1px solid var(--line-soft); border-radius:999px; padding:0 8px; background:var(--canvas); color:var(--muted); font-size:11px; font-weight:500; line-height:1; letter-spacing:.01em; }
     .section-body { padding:20px; }
     .setup-layout { display:grid; gap:16px; }
-    .setup-pair { display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; }
+    .setup-pair { width:min(1180px,100%); display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; margin:0 auto; }
     .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
     .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
@@ -106,6 +107,10 @@
     .file-name { min-width:0; overflow:hidden; padding:0 11px; color:var(--muted); font-weight:400; text-overflow:ellipsis; white-space:nowrap; }
     .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
     .actions .field { min-width:220px; }
+    .setup-actions { width:min(1180px,100%); margin:18px auto 0; }
+    .finalize-controls { min-height:52px; display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap; }
+    .finalize-controls .mode-select { width:260px; }
+    .finalize-controls .checkbox { min-height:36px; }
     .checkbox { min-height:40px; display:inline-flex; align-items:center; gap:9px; border-radius:6px; color:#344054; font-size:14px; cursor:pointer; }
     .checkbox input { width:16px; min-height:16px; height:16px; margin:0; box-shadow:none; }
     .toast-region { position:fixed; top:max(16px,env(safe-area-inset-top)); right:max(16px,env(safe-area-inset-right)); z-index:120; width:min(420px,calc(100% - 32px)); display:grid; gap:10px; pointer-events:none; }
@@ -182,6 +187,8 @@
       .row button,.part-cell button,.actions > button { width:100%; }
       .actions { align-items:stretch; }
       .actions .field { width:100%; min-width:0; }
+      .finalize-controls { align-items:stretch; flex-direction:column; }
+      .finalize-controls .mode-select,.finalize-controls > button { width:100%; }
       .checkbox { width:100%; }
       .page-actions { display:grid; grid-template-columns:1fr 1fr; }
       .page-actions button,.page-actions .workflow-note { width:100%; }
@@ -227,6 +234,7 @@
 
     <main id="main-content" tabindex="-1">
       <section aria-label="BOM setup">
+        <span class="step-marker" aria-hidden="true">Step 1</span>
         <div class="section-body">
           <div class="setup-layout">
             <div class="setup-pair">
@@ -255,11 +263,12 @@
               </div>
             </div>
           </div>
-          <div class="actions"><button id="preview" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m14 7 5 5-5 5"></path></svg>Preview BOM &amp; Check Stock</button></div>
+          <div class="actions setup-actions"><button id="preview" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m14 7 5 5-5 5"></path></svg>Preview BOM &amp; Check Stock</button></div>
         </div>
       </section>
 
       <section id="review" class="hidden" aria-label="BOM review and resolution">
+        <span class="step-marker" aria-hidden="true">Step 2</span>
         <div class="section-body">
           <div class="summary" aria-label="BOM summary">
             <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
@@ -283,14 +292,14 @@
       </section>
 
       <section id="final-section" class="hidden" aria-label="Finalize InvenTree BOM">
+        <span class="step-marker" aria-hidden="true">Step 3</span>
         <div class="section-body">
-          <div class="actions">
-            <label class="field" for="mode">Import Mode
-              <select id="mode" name="import_mode"><option value="merge">Merge / update matching lines</option><option value="replace">Replace the entire existing BOM</option></select>
-            </label>
+          <div class="finalize-controls">
+            <label class="visually-hidden" for="mode">Import Mode</label>
+            <select id="mode" class="mode-select" name="import_mode"><option value="merge">Merge / update matching lines</option><option value="replace">Replace the entire existing BOM</option></select>
             <label class="checkbox" for="validate"><input id="validate" name="validate" type="checkbox"> Mark imported BOM lines as validated</label>
             <label id="create-missing-wrap" class="checkbox hidden" for="create-missing"><input id="create-missing" name="create_missing" type="checkbox"> Create unresolved component parts</label>
-            <button id="finalize" type="button">Finalize BOM</button>
+            <button id="finalize" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10"></path></svg>Finalize BOM</button>
           </div>
         </div>
       </section>
