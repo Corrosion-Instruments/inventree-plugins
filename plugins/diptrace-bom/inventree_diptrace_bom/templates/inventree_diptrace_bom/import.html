@@ -72,10 +72,9 @@
     .workflow-note { border:1px solid var(--line); background:var(--surface); color:#344054; box-shadow:var(--shadow); }
     main { min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
     section { min-width:0; position:relative; scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
-    .step-marker { position:absolute; top:-10px; left:16px; z-index:3; min-height:20px; display:inline-flex; align-items:center; border:1px solid var(--line-soft); border-radius:999px; padding:0 8px; background:var(--canvas); color:var(--muted); font-size:11px; font-weight:500; line-height:1; letter-spacing:.01em; }
     .section-body { min-width:0; padding:20px; }
     .setup-layout { display:grid; gap:16px; }
-    .setup-pair { width:min(1180px,100%); display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; margin:0 auto; }
+    .setup-pair { width:min(1180px,100%); display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; margin:0; }
     .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
     .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
@@ -107,7 +106,7 @@
     .file-name { min-width:0; overflow:hidden; padding:0 11px; color:var(--muted); font-weight:400; text-overflow:ellipsis; white-space:nowrap; }
     .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
     .actions .field { min-width:220px; }
-    .setup-actions { width:min(1180px,100%); margin:18px auto 0; }
+    .setup-actions { width:min(1180px,100%); margin:18px 0 0; }
     .finalize-controls { display:grid; justify-items:start; gap:12px; }
     .finalize-row { display:flex; align-items:center; justify-content:flex-start; gap:12px; flex-wrap:wrap; }
     .finalize-controls .mode-select { width:260px; font-size:13px; font-weight:500; }
@@ -204,16 +203,34 @@
     .hidden { display:none !important; }
     .visually-hidden { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
     dialog { width:min(720px,calc(100% - 32px)); max-height:calc(100dvh - 40px); border:1px solid var(--line-soft); border-radius:8px; padding:0; box-shadow:0 24px 48px rgba(16,24,40,.22); overscroll-behavior:contain; }
-    dialog::backdrop { background:rgba(16,24,40,.55); }
+    dialog::backdrop { background:rgba(16,24,40,.54); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); }
     .dialog-body { display:grid; gap:16px; padding:20px; }
     .dialog-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
-    .dialog-header h2 { margin:0; font-size:19px; }
+    .dialog-header h2 { margin:0; font-size:19px; font-weight:500; }
     .dialog-header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
-    .search-results { max-height:360px; overflow:auto; display:grid; gap:8px; overscroll-behavior:contain; }
-    .result { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px; border:1px solid var(--line-soft); border-radius:6px; }
-    .result div { min-width:0; }
-    .result strong,.result small { overflow-wrap:anywhere; }
-    .result small { display:block; margin-top:3px; color:var(--muted); line-height:1.4; }
+    .command-dialog { width:min(600px,calc(100% - 32px)); overflow:hidden; border-color:#d9dde5; border-radius:10px; background:var(--surface); box-shadow:0 26px 70px rgba(16,24,40,.28); }
+    .command-shell { min-width:0; }
+    .command-header { min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line-soft); padding:0 10px 0 14px; }
+    .command-header h2 { margin:0; font-size:14px; font-weight:500; letter-spacing:-.01em; }
+    .command-search { min-height:52px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; border-bottom:1px solid var(--line-soft); padding:7px 8px 7px 14px; }
+    .command-search > .icon { width:17px; height:17px; color:var(--muted); }
+    .command-search input { min-height:36px; border:0; padding:0; box-shadow:none; font-size:14px; }
+    .command-search input:focus-visible { outline:0; }
+    .command-search:focus-within { box-shadow:inset 3px 0 0 var(--action); }
+    button.command-search-action { width:36px; min-height:36px; border-color:transparent; padding:0; background:transparent; color:var(--muted); }
+    button.command-search-action:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
+    .command-group-label { padding:10px 14px 6px; color:var(--muted); font-size:11px; font-weight:500; letter-spacing:.01em; }
+    .search-results { max-height:min(390px,55dvh); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:none; }
+    .search-results::-webkit-scrollbar { display:none; }
+    button.result { width:100%; min-width:0; min-height:54px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; border:0; border-bottom:1px solid var(--line-soft); border-radius:0; padding:9px 14px; background:var(--surface); color:var(--ink); text-align:left; white-space:normal; box-shadow:none; }
+    button.result:last-child { border-bottom:0; }
+    button.result:hover:not(:disabled),button.result:focus-visible { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
+    .result-copy { min-width:0; }
+    .result-name,.result-meta { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .result-name { font-size:13px; font-weight:500; }
+    .result-meta { margin-top:3px; color:var(--muted); font-size:12px; font-weight:400; }
+    .result-arrow { color:var(--subtle); }
+    .command-empty { padding:24px 14px; color:var(--muted); font-size:13px; text-align:center; }
     .dialog-actions { display:flex; justify-content:flex-end; }
     .dialog-actions.split { justify-content:space-between; gap:10px; }
     .loading-dialog { width:min(390px,calc(100% - 32px)); }
@@ -292,7 +309,6 @@
 
     <main id="main-content" tabindex="-1">
       <section aria-label="BOM setup">
-        <span class="step-marker" aria-hidden="true">Step 1</span>
         <div class="section-body">
           <div class="setup-layout">
             <div class="setup-pair">
@@ -326,7 +342,6 @@
       </section>
 
       <section id="review" class="hidden" aria-label="BOM review and resolution">
-        <span class="step-marker" aria-hidden="true">Step 2</span>
         <div class="section-body">
           <div class="summary" aria-label="BOM summary">
             <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
@@ -376,7 +391,6 @@
       </section>
 
       <section id="final-section" class="hidden" aria-label="Finalize InvenTree BOM">
-        <span class="step-marker" aria-hidden="true">Step 3</span>
         <div class="section-body">
           <div class="finalize-controls">
             <div class="finalize-row">
@@ -423,20 +437,19 @@
     </div>
   </dialog>
 
-  <dialog id="part-dialog" aria-labelledby="part-dialog-title">
-    <div class="dialog-body">
-      <div class="dialog-header">
-        <div>
-          <h2 id="part-dialog-title">Find an InvenTree Part</h2>
-          <p>Search by catalogue identity, then select the exact match.</p>
-        </div>
+  <dialog id="part-dialog" class="command-dialog" aria-labelledby="part-dialog-title">
+    <div class="command-shell">
+      <div class="command-header">
+        <h2 id="part-dialog-title">Find an InvenTree Part</h2>
+        <button id="part-close" class="icon-button" type="button" aria-label="Close part search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg></button>
       </div>
-      <div class="field">
-        <label for="part-query">Part Search</label>
-        <div class="row"><input id="part-query" name="part_query" type="search" placeholder="Search by name, IPN, JLC SKU, or MPN…" autocomplete="off" spellcheck="false"><button id="part-search" type="button">Search Parts</button></div>
+      <div class="command-search">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input id="part-query" name="part_query" type="search" aria-label="Search InvenTree parts" placeholder="Search by name, IPN, JLC SKU, or MPN…" autocomplete="off" spellcheck="false">
+        <button id="part-search" class="command-search-action" type="button" aria-label="Search parts" title="Search parts"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m14 7 5 5-5 5"></path></svg></button>
       </div>
-      <div id="part-results" class="search-results" role="list" aria-live="polite"></div>
-      <div class="dialog-actions"><button id="part-close" class="secondary" type="button">Close</button></div>
+      <div class="command-group-label">Parts</div>
+      <div id="part-results" class="search-results" aria-live="polite"></div>
     </div>
   </dialog>
 
@@ -935,7 +948,9 @@
       const row = state.preview.rows.find(item => item.row === rowNumber);
       el['part-query'].value = row.jlcpcb_part || row.comment || '';
       el['part-results'].innerHTML = '';
-      el['part-dialog'].showModal(); searchParts().catch(error => showError(error, 'Part Search Failed'));
+      el['part-dialog'].showModal();
+      window.requestAnimationFrame(()=>el['part-query'].focus({preventScroll:true}));
+      searchParts().catch(error => showError(error, 'Part Search Failed'));
     }
     async function searchParts() {
       const query=el['part-query'].value.trim(); if (query.length < 2) throw new Error('Enter at least two search characters');
@@ -946,13 +961,15 @@
       try {
         const result=await getJson(`parts/?q=${encodeURIComponent(query)}`); el['part-results'].innerHTML='';
         for (const part of result.parts || []) {
-          const item=document.createElement('div'); item.className='result'; item.setAttribute('role', 'listitem');
-          const copy=document.createElement('div'); const name=document.createElement('strong'); name.textContent=part.label;
-          const meta=document.createElement('small'); meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
-          const choose=document.createElement('button'); choose.type='button'; choose.className='small'; choose.textContent='Select Part';
-          choose.addEventListener('click',()=>choosePart(part)); item.append(copy,choose); el['part-results'].appendChild(item);
+          const item=document.createElement('button'); item.type='button'; item.className='result';
+          const copy=document.createElement('span'); copy.className='result-copy';
+          const name=document.createElement('span'); name.className='result-name'; name.textContent=part.label;
+          const meta=document.createElement('span'); meta.className='result-meta'; meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
+          const arrow=document.createElementNS('http://www.w3.org/2000/svg','svg'); arrow.classList.add('icon','result-arrow'); arrow.setAttribute('viewBox','0 0 24 24'); arrow.setAttribute('aria-hidden','true');
+          const arrowPath=document.createElementNS('http://www.w3.org/2000/svg','path'); arrowPath.setAttribute('d','m9 18 6-6-6-6'); arrow.appendChild(arrowPath);
+          item.setAttribute('aria-label',`Select ${part.label}`); item.addEventListener('click',()=>choosePart(part)); item.append(copy,arrow); el['part-results'].appendChild(item);
         }
-        if (!(result.parts || []).length) el['part-results'].textContent='No parts found. Try a name, IPN, JLC SKU, or manufacturer MPN.';
+        if (!(result.parts || []).length) { const empty=document.createElement('div'); empty.className='command-empty'; empty.textContent='No parts found. Try a name, IPN, JLC SKU, or manufacturer MPN.'; el['part-results'].appendChild(empty); }
       } finally {
         hideLoading();
         button.disabled = false;
