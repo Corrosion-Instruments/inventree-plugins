@@ -72,10 +72,9 @@
     .workflow-note { border:1px solid var(--line); background:var(--surface); color:#344054; box-shadow:var(--shadow); }
     main { min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
     section { min-width:0; position:relative; scroll-margin-top:20px; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:var(--shadow); }
-    .step-marker { position:absolute; top:-10px; left:16px; z-index:3; min-height:20px; display:inline-flex; align-items:center; border:1px solid var(--line-soft); border-radius:999px; padding:0 8px; background:var(--canvas); color:var(--muted); font-size:11px; font-weight:500; line-height:1; letter-spacing:.01em; }
     .section-body { min-width:0; padding:20px; }
     .setup-layout { display:grid; gap:16px; }
-    .setup-pair { width:min(1180px,100%); display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; margin:0 auto; }
+    .setup-pair { width:min(1180px,100%); display:grid; grid-template-columns:minmax(280px,1fr) minmax(320px,1.15fr); gap:20px; align-items:start; margin:0; }
     .field { display:grid; gap:7px; color:#344054; font-size:13px; font-weight:600; }
     .field-help { color:var(--muted); font-weight:400; line-height:1.45; }
     .row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
@@ -107,7 +106,7 @@
     .file-name { min-width:0; overflow:hidden; padding:0 11px; color:var(--muted); font-weight:400; text-overflow:ellipsis; white-space:nowrap; }
     .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
     .actions .field { min-width:220px; }
-    .setup-actions { width:min(1180px,100%); margin:18px auto 0; }
+    .setup-actions { width:min(1180px,100%); margin:18px 0 0; }
     .finalize-controls { display:grid; justify-items:start; gap:12px; }
     .finalize-row { display:flex; align-items:center; justify-content:flex-start; gap:12px; flex-wrap:wrap; }
     .finalize-controls .mode-select { width:260px; font-size:13px; font-weight:500; }
@@ -127,19 +126,54 @@
     .toast-action { display:inline-block; margin-top:8px; font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
     @keyframes toast-in { from { opacity:0; transform:translateY(-8px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(.98); } }
-    .summary { display:grid; grid-template-columns:1.4fr repeat(4,1fr); margin-bottom:16px; border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
+    .summary { display:grid; grid-template-columns:1.4fr repeat(5,1fr); margin-bottom:16px; border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
     .metric { min-width:0; padding:13px 14px; background:var(--band); }
     .metric + .metric { border-left:1px solid var(--line-soft); }
     .metric span { display:block; color:var(--muted); font-size:12px; }
     .metric strong { display:block; margin-top:4px; font-size:18px; line-height:1.3; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+    .build-plan { min-width:0; display:grid; grid-template-columns:260px minmax(0,1fr); margin-bottom:16px; overflow:hidden; border:1px solid var(--line-soft); border-radius:7px; background:var(--surface); }
+    .build-target-field { display:grid; align-content:start; gap:6px; border-right:1px solid var(--line-soft); padding:14px; background:var(--band); }
+    .build-target-field label { color:#344054; font-size:13px; font-weight:600; }
+    .build-target-field input { width:150px; font-size:13px; font-weight:500; font-variant-numeric:tabular-nums; }
+    .build-target-field small { color:var(--muted); font-size:12px; line-height:1.4; }
+    .target-analysis { min-width:0; padding:14px; }
+    .target-overview { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .target-statuses { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+    .target-filter { display:inline-flex; align-items:center; gap:2px; border:1px solid var(--line-soft); border-radius:6px; padding:2px; background:var(--band); }
+    button.target-filter-button { min-height:28px; border:0; border-radius:4px; padding:0 9px; background:transparent; color:var(--muted); font-size:12px; box-shadow:none; }
+    button.target-filter-button:hover:not(:disabled) { border-color:transparent; background:var(--surface); color:var(--ink); }
+    button.target-filter-button[aria-pressed="true"] { background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(16,24,40,.08); }
+    .plan-status { display:inline-flex; align-items:center; min-height:28px; border-radius:999px; padding:4px 9px; background:#f2f4f7; color:#475467; font-size:12px; font-weight:600; }
+    .plan-status.ready { background:var(--ok-soft); color:var(--ok); }
+    .plan-status.short { background:var(--warn-soft); color:var(--warn); }
+    .plan-status.excluded { border-radius:6px; background:#f2f4f7; color:#475467; font-weight:500; }
+    .shortage-list { max-height:260px; display:grid; gap:7px; overflow:auto; margin-top:12px; overscroll-behavior:contain; }
+    .shortage-item { min-width:0; display:grid; grid-template-columns:minmax(230px,1.3fr) minmax(240px,1fr) auto; align-items:center; gap:12px; border-top:1px solid var(--line-soft); padding-top:8px; }
+    .shortage-part { min-width:0; }
+    .shortage-part strong,.shortage-part small { display:block; overflow-wrap:anywhere; }
+    .shortage-part strong { font-size:13px; font-weight:600; }
+    .shortage-part small { margin-top:2px; color:var(--muted); font-size:12px; }
+    .shortage-source { color:#475467; font-size:12px; line-height:1.4; }
+    .shortage-source strong { display:block; color:var(--ink); font-size:12px; font-weight:600; }
+    .shortage-source.missing strong { color:var(--danger); }
+    button.shortage-exclude { min-height:30px; justify-self:end; padding:0 9px; font-size:12px; }
+    tbody tr.target-shortage td:first-child { box-shadow:inset 3px 0 0 #f79009; }
+    .calculation-toolbar { min-height:36px; display:flex; align-items:flex-start; justify-content:flex-end; gap:10px; margin-bottom:8px; color:var(--muted); font-size:12px; }
+    .calculation-toolbar button { min-height:30px; padding:0 9px; font-size:12px; }
+    .calculation-exclusion-badges { display:flex; flex:1; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    button.calculation-exclusion-badge { min-height:30px; max-width:260px; display:inline-flex; align-items:center; gap:6px; border-radius:6px; background:#f7f8fa; color:#475467; font-weight:500; }
+    button.calculation-exclusion-badge:hover:not(:disabled),button.calculation-exclusion-badge:focus-visible { background:#eef0f3; color:var(--ink); }
+    .calculation-exclusion-badge span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .calculation-exclusion-badge .icon { flex:0 0 auto; }
     .table-wrap { max-width:100%; overflow:auto; max-height:min(68vh,760px); border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
-    table { width:100%; min-width:1330px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
+    table { width:100%; min-width:1380px; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:13px; }
+    col.col-calc { width:58px; }
     col.col-refs { width:150px; }
     col.col-value { width:95px; }
     col.col-footprint { width:175px; }
     col.col-qty { width:50px; }
-    col.col-jlc { width:110px; }
-    col.col-match { width:395px; }
+    col.col-jlc { width:160px; }
+    col.col-match { width:275px; }
     col.col-stock { width:80px; }
     col.col-stock-wide { width:90px; }
     th,td { border-bottom:1px solid #e3e6eb; border-right:1px solid #e8eaee; padding:11px 10px; text-align:left; vertical-align:middle; }
@@ -148,15 +182,24 @@
     tbody tr:nth-child(odd) td { background:#fff; }
     tbody tr:nth-child(even) td { background:#f7f8fa; }
     tbody tr:hover td { background:#eef3f8; }
-    tbody tr { content-visibility:auto; contain-intrinsic-size:48px; }
-    th { position:sticky; top:0; z-index:2; border-bottom-color:#cfd4dc; padding-top:12px; padding-bottom:12px; background:#eef0f3; color:#344054; font-size:13px; font-weight:600; line-height:1.2; letter-spacing:0; white-space:nowrap; box-shadow:inset 0 -1px 0 rgba(16,24,40,.04); }
+    tbody tr.calculation-excluded td { color:#98a2b3; }
+    tbody tr.calculation-excluded td:not(.calculation-cell) { opacity:.68; }
+    tbody tr.calculation-excluded td:first-child { box-shadow:inset 3px 0 0 #98a2b3; }
+    th { position:sticky; top:0; z-index:2; border-bottom-color:#cfd4dc; padding-top:15px; padding-bottom:15px; background:#eef0f3; color:#344054; font-size:13px; font-weight:600; line-height:1.2; letter-spacing:0; white-space:nowrap; box-shadow:inset 0 -1px 0 rgba(16,24,40,.04); }
     th[title] { cursor:help; }
     td { color:#253044; line-height:1.4; }
     td:first-child { font-weight:500; }
     td select { min-width:0; min-height:36px; padding:5px 30px 5px 9px; font-size:13px; font-weight:400; }
     td.numeric,th.numeric { text-align:right; font-variant-numeric:tabular-nums; }
+    .calculation-cell { text-align:center; }
+    .calculation-toggle { width:16px; min-height:16px; height:16px; margin:0; box-shadow:none; cursor:pointer; }
     .identifier { color:#344054; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .jlc-part-cell { position:relative; padding-right:40px; }
+    .jlc-part-code { display:block; white-space:nowrap; }
+    button.copy-part-button { position:absolute; top:8px; right:6px; width:28px; min-height:28px; border-color:transparent; padding:0; background:transparent; color:var(--muted); opacity:.72; }
+    button.copy-part-button:hover:not(:disabled),button.copy-part-button:focus-visible { border-color:var(--line-soft); background:var(--surface); color:var(--ink); opacity:1; }
     .part-cell { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; }
+    button.part-search-button { width:36px; min-height:36px; padding:0; }
     .status { display:inline-block; margin-top:6px; border-radius:999px; padding:3px 8px; background:#f2f4f7; color:#475467; font-size:11px; line-height:1.35; }
     .status.matched { color:var(--ok); background:var(--ok-soft); }
     .status.unmatched,.status.ambiguous { color:var(--warn); background:var(--warn-soft); }
@@ -171,16 +214,34 @@
     .hidden { display:none !important; }
     .visually-hidden { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
     dialog { width:min(720px,calc(100% - 32px)); max-height:calc(100dvh - 40px); border:1px solid var(--line-soft); border-radius:8px; padding:0; box-shadow:0 24px 48px rgba(16,24,40,.22); overscroll-behavior:contain; }
-    dialog::backdrop { background:rgba(16,24,40,.55); }
+    dialog::backdrop { background:rgba(16,24,40,.54); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); }
     .dialog-body { display:grid; gap:16px; padding:20px; }
     .dialog-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
-    .dialog-header h2 { margin:0; font-size:19px; }
+    .dialog-header h2 { margin:0; font-size:19px; font-weight:500; }
     .dialog-header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
-    .search-results { max-height:360px; overflow:auto; display:grid; gap:8px; overscroll-behavior:contain; }
-    .result { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px; border:1px solid var(--line-soft); border-radius:6px; }
-    .result div { min-width:0; }
-    .result strong,.result small { overflow-wrap:anywhere; }
-    .result small { display:block; margin-top:3px; color:var(--muted); line-height:1.4; }
+    .command-dialog { width:min(600px,calc(100% - 32px)); overflow:hidden; border-color:#d9dde5; border-radius:10px; background:var(--surface); box-shadow:0 26px 70px rgba(16,24,40,.28); }
+    .command-shell { min-width:0; }
+    .command-header { min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line-soft); padding:0 10px 0 14px; }
+    .command-header h2 { margin:0; font-size:14px; font-weight:500; letter-spacing:-.01em; }
+    .command-search { min-height:52px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; border-bottom:1px solid var(--line-soft); padding:7px 8px 7px 14px; }
+    .command-search > .icon { width:17px; height:17px; color:var(--muted); }
+    .command-search input { min-height:36px; border:0; padding:0; box-shadow:none; font-size:14px; }
+    .command-search input:focus-visible { outline:0; }
+    .command-search:focus-within { box-shadow:inset 3px 0 0 var(--action); }
+    button.command-search-action { width:36px; min-height:36px; border-color:transparent; padding:0; background:transparent; color:var(--muted); }
+    button.command-search-action:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
+    .command-group-label { padding:10px 14px 6px; color:var(--muted); font-size:11px; font-weight:500; letter-spacing:.01em; }
+    .search-results { max-height:min(390px,55dvh); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:none; }
+    .search-results::-webkit-scrollbar { display:none; }
+    button.result { width:100%; min-width:0; min-height:54px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; border:0; border-bottom:1px solid var(--line-soft); border-radius:0; padding:9px 14px; background:var(--surface); color:var(--ink); text-align:left; white-space:normal; box-shadow:none; }
+    button.result:last-child { border-bottom:0; }
+    button.result:hover:not(:disabled),button.result:focus-visible { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
+    .result-copy { min-width:0; }
+    .result-name,.result-meta { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .result-name { font-size:13px; font-weight:500; }
+    .result-meta { margin-top:3px; color:var(--muted); font-size:12px; font-weight:400; }
+    .result-arrow { color:var(--subtle); }
+    .command-empty { padding:24px 14px; color:var(--muted); font-size:13px; text-align:center; }
     .dialog-actions { display:flex; justify-content:flex-end; }
     .dialog-actions.split { justify-content:space-between; gap:10px; }
     .loading-dialog { width:min(390px,calc(100% - 32px)); }
@@ -196,6 +257,10 @@
       .setup-pair,.summary { grid-template-columns:1fr; }
       .metric + .metric { border-left:0; border-top:1px solid var(--line-soft); }
       .summary { display:grid; }
+      .build-plan { grid-template-columns:1fr; }
+      .build-target-field { border-right:0; border-bottom:1px solid var(--line-soft); }
+      .shortage-item { grid-template-columns:1fr; gap:6px; }
+      button.shortage-exclude { justify-self:start; }
       .nav-shell { align-items:flex-start; padding:14px 0; }
       .nav-links { justify-content:flex-end; }
     }
@@ -205,8 +270,8 @@
       .nav-links a { padding:7px 8px; }
       .page-shell { padding-top:20px; }
       .section-body { padding:16px; }
-      .row,.part-cell { grid-template-columns:1fr; }
-      .row button,.part-cell button,.actions > button { width:100%; }
+      .row { grid-template-columns:1fr; }
+      .row button,.actions > button { width:100%; }
       .actions { align-items:stretch; }
       .actions .field { width:100%; min-width:0; }
       .finalize-controls,.finalize-row { width:100%; }
@@ -256,7 +321,6 @@
 
     <main id="main-content" tabindex="-1">
       <section aria-label="BOM setup">
-        <span class="step-marker" aria-hidden="true">Step 1</span>
         <div class="section-body">
           <div class="setup-layout">
             <div class="setup-pair">
@@ -290,26 +354,50 @@
       </section>
 
       <section id="review" class="hidden" aria-label="BOM review and resolution">
-        <span class="step-marker" aria-hidden="true">Step 2</span>
         <div class="section-body">
           <div class="summary" aria-label="BOM summary">
             <div class="metric"><span>File</span><strong id="metric-file">—</strong></div>
             <div class="metric"><span>BOM Lines</span><strong id="metric-lines">0</strong></div>
             <div class="metric"><span>Matched</span><strong id="metric-matched">0</strong></div>
             <div class="metric"><span>Unresolved</span><strong id="metric-unresolved">0</strong></div>
-            <div class="metric"><span>Can Build Locally</span><strong id="metric-can-build">0</strong></div>
+            <div class="metric" title="Complete products buildable from local InvenTree stock"><span>Local BOM Builds</span><strong id="metric-local-builds">0</strong></div>
+            <div class="metric" title="Complete products buildable from JLC Stock plus My Inventory"><span>External BOM Builds</span><strong id="metric-external-builds">0</strong></div>
+          </div>
+          <div class="build-plan">
+            <div class="build-target-field">
+              <label for="build-target">Build Target</label>
+              <input id="build-target" name="build_target" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 100" autocomplete="off">
+              <small>Finished products you want to build.</small>
+            </div>
+            <div id="target-analysis" class="target-analysis hidden" aria-live="polite">
+              <div class="target-overview">
+                <div class="target-statuses">
+                  <span id="target-combined-summary" class="plan-status"></span>
+                  <span id="target-exclusion-summary" class="plan-status excluded hidden"></span>
+                </div>
+                <div class="target-filter" aria-label="Build target component filter">
+                  <button id="target-filter-all" class="target-filter-button" type="button" aria-pressed="true">All</button>
+                  <button id="target-filter-missing" class="target-filter-button" type="button" aria-pressed="false">Missing only</button>
+                </div>
+              </div>
+              <div id="target-shortage-list" class="shortage-list"></div>
+            </div>
+          </div>
+          <div id="calculation-toolbar" class="calculation-toolbar hidden" aria-live="polite">
+            <div id="calculation-exclusion-count" class="calculation-exclusion-badges" aria-label="Components excluded from build calculations"></div>
+            <button id="reset-calculation-exclusions" class="secondary" type="button">Reset exclusions</button>
           </div>
           <div class="table-wrap" tabindex="0" aria-label="Scrollable BOM review table">
             <table>
               <caption class="visually-hidden">DipTrace BOM lines with InvenTree matches and stock availability</caption>
               <colgroup>
-                <col class="col-refs"><col class="col-value"><col class="col-footprint"><col class="col-qty"><col class="col-jlc"><col class="col-match">
-                <col class="col-stock"><col class="col-stock"><col class="col-stock-wide"><col class="col-stock-wide">
+                <col class="col-jlc"><col class="col-match"><col class="col-stock"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide"><col class="col-stock-wide">
+                <col class="col-footprint"><col class="col-refs"><col class="col-value"><col class="col-qty"><col class="col-calc">
               </colgroup>
               <thead><tr>
-                <th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th scope="col">Footprint</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th>
-                <th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th><th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local stock">Builds</th>
-                <th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th>
+                <th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th><th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th>
+                <th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local InvenTree stock">Local Builds</th><th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th><th class="numeric" scope="col" aria-label="Assemblies buildable from JLCPCB stock and My Inventory" title="Floor of (JLC Stock + My Inventory) divided by required quantity">External Builds</th>
+                <th scope="col">Footprint</th><th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th class="calculation-cell" scope="col" aria-label="Include in build calculations" title="Include this component in build-capacity and target calculations">Use</th>
               </tr></thead>
               <tbody id="bom-rows"></tbody>
             </table>
@@ -318,7 +406,6 @@
       </section>
 
       <section id="final-section" class="hidden" aria-label="Finalize InvenTree BOM">
-        <span class="step-marker" aria-hidden="true">Step 3</span>
         <div class="section-body">
           <div class="finalize-controls">
             <div class="finalize-row">
@@ -365,28 +452,29 @@
     </div>
   </dialog>
 
-  <dialog id="part-dialog" aria-labelledby="part-dialog-title">
-    <div class="dialog-body">
-      <div class="dialog-header">
-        <div>
-          <h2 id="part-dialog-title">Find an InvenTree Part</h2>
-          <p>Search by catalogue identity, then select the exact match.</p>
-        </div>
+  <dialog id="part-dialog" class="command-dialog" aria-labelledby="part-dialog-title">
+    <div class="command-shell">
+      <div class="command-header">
+        <h2 id="part-dialog-title">Find an InvenTree Part</h2>
+        <button id="part-close" class="icon-button" type="button" aria-label="Close part search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg></button>
       </div>
-      <div class="field">
-        <label for="part-query">Part Search</label>
-        <div class="row"><input id="part-query" name="part_query" type="search" placeholder="Search by name, IPN, JLC SKU, or MPN…" autocomplete="off" spellcheck="false"><button id="part-search" type="button">Search Parts</button></div>
+      <div class="command-search">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input id="part-query" name="part_query" type="search" aria-label="Search InvenTree parts" placeholder="Search by name, IPN, JLC SKU, or MPN…" autocomplete="off" spellcheck="false">
+        <button id="part-search" class="command-search-action" type="button" aria-label="Search parts" title="Search parts"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m14 7 5 5-5 5"></path></svg></button>
       </div>
-      <div id="part-results" class="search-results" role="list" aria-live="polite"></div>
-      <div class="dialog-actions"><button id="part-close" class="secondary" type="button">Close</button></div>
+      <div class="command-group-label">Parts</div>
+      <div id="part-results" class="search-results" aria-live="polite"></div>
     </div>
   </dialog>
 
   <script>
-    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false };
+    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false, targetFilter: 'all', calculationExclusions: new Set() };
     const el = Object.fromEntries([
       'assembly-query','assembly-toggle','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
-      'metric-matched','metric-unresolved','metric-can-build','bom-rows','final-section','mode','validate',
+      'metric-matched','metric-unresolved','metric-local-builds','metric-external-builds','build-target','target-analysis',
+      'target-combined-summary','target-exclusion-summary','target-filter-all','target-filter-missing','target-shortage-list','bom-rows','final-section','mode','validate',
+      'calculation-toolbar','calculation-exclusion-count','reset-calculation-exclusions',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
       'confirm-dialog','confirm-cancel','confirm-accept'
@@ -703,10 +791,15 @@
     }
     function renderPreview() {
       const data = state.preview; const summary = data.summary;
+      state.calculationExclusions.clear();
+      state.targetFilter='all';
+      el['target-filter-all'].setAttribute('aria-pressed','true');
+      el['target-filter-missing'].setAttribute('aria-pressed','false');
       el['metric-file'].textContent = data.filename; el['metric-lines'].textContent = summary.line_count;
       el['metric-matched'].textContent = summary.matched; el['metric-unresolved'].textContent = summary.unresolved;
-      el['metric-can-build'].textContent = summary.can_build; el['bom-rows'].innerHTML = '';
+      el['bom-rows'].innerHTML = '';
       for (const row of data.rows) el['bom-rows'].appendChild(renderRow(row));
+      updateBuildCalculations();
       el.review.classList.remove('hidden'); el['final-section'].classList.remove('hidden');
       el['create-missing-wrap'].classList.toggle('hidden', !data.settings.allow_create_missing);
       el['create-missing'].checked = false;
@@ -714,19 +807,33 @@
     }
     function renderRow(row) {
       const tr = document.createElement('tr'); tr.dataset.row = row.row;
-      for (const [index,value] of [row.designators,row.comment,row.footprint,row.quantity,row.jlcpcb_part].entries()) {
-        const td = document.createElement('td'); td.textContent = value || '—';
-        if (index === 3) td.classList.add('numeric');
-        if (index === 4) { td.classList.add('identifier'); td.setAttribute('translate','no'); }
-        tr.appendChild(td);
-      }
+      const textCell=(value,{numeric=false,identifier=false}={})=>{
+        const td=document.createElement('td'); td.textContent=value || value === 0 ? value : '—';
+        if (numeric) td.classList.add('numeric');
+        if (identifier) { td.classList.add('identifier'); td.setAttribute('translate','no'); }
+        return td;
+      };
+      const calculationTd=document.createElement('td'); calculationTd.className='calculation-cell';
+      const calculationToggle=document.createElement('input'); calculationToggle.type='checkbox'; calculationToggle.checked=true; calculationToggle.className='calculation-toggle'; calculationToggle.dataset.row=row.row;
+      calculationToggle.setAttribute('aria-label', `Include ${row.designators || `BOM row ${row.row}`} in build calculations`);
+      calculationToggle.title='Calculation only — this does not change the finalized BOM';
+      calculationToggle.addEventListener('change',()=>setCalculationInclusion(row.row,calculationToggle.checked));
+      calculationTd.appendChild(calculationToggle);
+      const jlcPart=row.jlcpcb_part || '';
+      const jlcTd=document.createElement('td'); jlcTd.className='identifier jlc-part-cell'; jlcTd.setAttribute('translate','no');
+      const jlcCode=document.createElement('span'); jlcCode.className='jlc-part-code'; jlcCode.textContent=jlcPart || '—'; jlcTd.appendChild(jlcCode);
+      const copyPart=document.createElement('button'); copyPart.type='button'; copyPart.className='copy-part-button'; copyPart.disabled=!jlcPart;
+      copyPart.title=jlcPart ? `Copy ${jlcPart}` : 'No JLC part to copy'; copyPart.setAttribute('aria-label',jlcPart ? `Copy JLC part ${jlcPart}` : 'No JLC part to copy');
+      copyPart.innerHTML='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"></path></svg>';
+      copyPart.addEventListener('click',()=>copyToClipboard(jlcPart,'JLC Part').catch(error=>showError(error,'Copy Failed'))); jlcTd.appendChild(copyPart); tr.appendChild(jlcTd);
       const partTd = document.createElement('td'); const wrap = document.createElement('div'); wrap.className = 'part-cell';
       const select = document.createElement('select'); select.className = 'part-selection'; select.dataset.row = row.row;
       select.name = `part_selection_${row.row}`;
       select.setAttribute('aria-label', `InvenTree part for ${row.designators || `BOM row ${row.row}`}`);
       const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Unresolved'; select.appendChild(blank);
       addPartOption(select, row.match.part, true); for (const candidate of row.match.candidates || []) addPartOption(select, candidate, false);
-      const find = document.createElement('button'); find.type='button'; find.className='secondary small'; find.textContent='Search';
+      const find = document.createElement('button'); find.type='button'; find.className='secondary small part-search-button';
+      find.innerHTML='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>';
       find.title='Search all InvenTree parts';
       find.setAttribute('aria-label', `Search InvenTree parts for ${row.designators || `BOM row ${row.row}`}`);
       find.addEventListener('click', () => openPartDialog(row.row)); wrap.append(select,find); partTd.appendChild(wrap);
@@ -737,11 +844,7 @@
       for (const value of [row.local.available,row.local.can_build,row.jlc.public_stock]) {
         const td=document.createElement('td'); td.classList.add('numeric'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
       }
-      const inventoryBuckets = [
-        ['JLCPCB Private Parts', stockNumber(row.jlc.jlcpcb_parts)],
-        ['Global Sourcing', stockNumber(row.jlc.global_sourcing)],
-        ['Consigned', stockNumber(row.jlc.consigned)],
-      ];
+      const inventoryBuckets = privateInventoryBuckets(row.jlc);
       const inventoryTotal = inventoryBuckets.reduce((total, [, value]) => total + value, 0);
       const inventoryTd = document.createElement('td'); inventoryTd.className='numeric'; if (inventoryTotal === 0) inventoryTd.classList.add('zero');
       const breakdown = document.createElement('span'); breakdown.className='inventory-breakdown'; breakdown.tabIndex=0;
@@ -751,16 +854,172 @@
       const tooltipTitle = document.createElement('strong'); tooltipTitle.textContent='My Inventory Breakdown'; tooltip.appendChild(tooltipTitle);
       for (const [label,value] of inventoryBuckets) { const line=document.createElement('span'); const name=document.createElement('span'); name.textContent=label; const amount=document.createElement('b'); amount.textContent=formatStock(value); line.append(name,amount); tooltip.appendChild(line); }
       breakdown.append(total,tooltip); inventoryTd.appendChild(breakdown); tr.appendChild(inventoryTd);
+      const publicStock = stockNumber(row.jlc.public_stock);
+      const requiredQuantity = stockNumber(row.quantity);
+      const externalBuilds = externalBuildCapacity(row);
+      const externalBuildsTd = document.createElement('td'); externalBuildsTd.className='numeric'; if (externalBuilds === 0) externalBuildsTd.classList.add('zero');
+      externalBuildsTd.textContent=formatStock(externalBuilds);
+      externalBuildsTd.title=`JLC Stock ${formatStock(publicStock)} + My Inventory ${formatStock(inventoryTotal)}; ${formatStock(requiredQuantity)} required per assembly`;
+      externalBuildsTd.setAttribute('aria-label', `${formatStock(externalBuilds)} external builds from JLC Stock ${formatStock(publicStock)} plus My Inventory ${formatStock(inventoryTotal)}, with ${formatStock(requiredQuantity)} required per assembly`);
+      tr.appendChild(externalBuildsTd);
+      tr.appendChild(textCell(row.footprint));
+      tr.appendChild(textCell(row.designators));
+      tr.appendChild(textCell(row.comment));
+      tr.appendChild(textCell(row.quantity,{numeric:true}));
+      tr.appendChild(calculationTd);
       return tr;
+    }
+    function privateInventoryBuckets(jlc) {
+      return [
+        ['JLCPCB Private Parts', stockNumber(jlc.jlcpcb_parts)],
+        ['Global Sourcing', stockNumber(jlc.global_sourcing)],
+        ['Consigned', stockNumber(jlc.consigned)],
+      ];
+    }
+    function externalBuildCapacity(row) {
+      const requiredQuantity=stockNumber(row.quantity); if (requiredQuantity <= 0) return 0;
+      const myInventory=privateInventoryBuckets(row.jlc).reduce((total,[,value]) => total + value,0);
+      return Math.floor((stockNumber(row.jlc.public_stock) + myInventory) / requiredQuantity);
+    }
+    function calculationRows() {
+      return state.preview ? state.preview.rows.filter(row => !state.calculationExclusions.has(String(row.row))) : [];
+    }
+    function calculationExclusionLabel(row) {
+      const component=row.jlcpcb_part || row.comment || row.footprint || `BOM row ${row.row}`;
+      return row.designators ? `${row.designators} · ${component}` : component;
+    }
+    function renderCalculationExclusionBadges() {
+      const container=el['calculation-exclusion-count'];
+      container.replaceChildren();
+      for (const key of state.calculationExclusions) {
+        const row=state.preview?.rows.find(item=>String(item.row) === key);
+        if (!row) continue;
+        const label=calculationExclusionLabel(row);
+        const badge=document.createElement('button');
+        badge.type='button'; badge.className='secondary calculation-exclusion-badge';
+        badge.title=`Include ${label} in build calculations`;
+        badge.setAttribute('aria-label', `Include ${label} in build calculations`);
+        const text=document.createElement('span'); text.textContent=label; badge.appendChild(text);
+        badge.insertAdjacentHTML('beforeend','<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>');
+        badge.addEventListener('click',()=>setCalculationInclusion(row.row,true,true));
+        container.appendChild(badge);
+      }
+    }
+    function setCalculationInclusion(rowNumber,included,announce=false) {
+      const key=String(rowNumber);
+      if (included) state.calculationExclusions.delete(key); else state.calculationExclusions.add(key);
+      const toggle=document.querySelector(`.calculation-toggle[data-row="${key}"]`);
+      if (toggle) toggle.checked=included;
+      const tableRow=document.querySelector(`#bom-rows tr[data-row="${key}"]`);
+      if (tableRow) {
+        tableRow.classList.toggle('calculation-excluded',!included);
+        tableRow.title=included ? '' : 'Excluded from build calculations only; remains in the BOM';
+      }
+      const row=state.preview?.rows.find(item=>String(item.row) === key);
+      updateBuildCalculations();
+      if (announce && row) {
+        const component=row.designators || `BOM row ${row.row}`;
+        notify(included ? `${component} is included in build calculations again.` : `${component} remains in the BOM but is excluded from build calculations.`, 'info', included ? 'Included in Calculations' : 'Excluded from Calculations');
+      }
+    }
+    function updateBuildCalculations() {
+      if (!state.preview) return;
+      const rows=calculationRows();
+      const localCapacities=rows.map(row => stockNumber(row.local.can_build));
+      const externalCapacities=rows.map(externalBuildCapacity);
+      el['metric-local-builds'].textContent=localCapacities.length ? formatStock(Math.min(...localCapacities)) : '—';
+      el['metric-external-builds'].textContent=externalCapacities.length ? formatStock(Math.min(...externalCapacities)) : '—';
+      const excluded=state.calculationExclusions.size;
+      el['calculation-toolbar'].classList.toggle('hidden',excluded === 0);
+      el['target-exclusion-summary'].classList.toggle('hidden',excluded === 0);
+      el['target-exclusion-summary'].textContent=excluded ? `${excluded} component line${excluded === 1 ? '' : 's'} excluded from calculations only` : '';
+      renderCalculationExclusionBadges();
+      const title=excluded ? `${excluded} BOM line${excluded === 1 ? '' : 's'} excluded from this calculation; the finalized BOM is unchanged` : '';
+      el['metric-local-builds'].parentElement.title=title || 'Complete products buildable from local InvenTree stock';
+      el['metric-external-builds'].parentElement.title=title || 'Complete products buildable from JLC Stock plus My Inventory';
+      updateTargetAnalysis();
+    }
+    function updateTargetAnalysis() {
+      document.querySelectorAll('#bom-rows tr').forEach(row => row.classList.remove('target-shortage'));
+      const target=Number(el['build-target'].value);
+      if (!state.preview || !Number.isInteger(target) || target < 1) { el['target-analysis'].classList.add('hidden'); return; }
+      const includedRows=calculationRows();
+      if (!includedRows.length) {
+        el['target-combined-summary'].className='plan-status';
+        el['target-combined-summary'].textContent='No components included';
+        el['target-shortage-list'].innerHTML='<div class="shortage-source">Include at least one BOM line to calculate build coverage.</div>';
+        el['target-analysis'].classList.remove('hidden');
+        return;
+      }
+      const coverage=includedRows.map(row => {
+        const required=stockNumber(row.quantity) * target;
+        const localAvailable=stockNumber(row.local.available);
+        const myInventory=privateInventoryBuckets(row.jlc).reduce((total,[,value]) => total + value,0);
+        const externalAvailable=stockNumber(row.jlc.public_stock) + myInventory;
+        const combinedAvailable=localAvailable + externalAvailable;
+        return {row,required,localAvailable,externalAvailable,combinedAvailable,shortage:Math.max(required-combinedAvailable,0)};
+      });
+      const blocking=coverage.filter(item => item.shortage > 0);
+      setPlanStatus(el['target-combined-summary'],'All sources',target,blocking.length);
+      const visible=state.targetFilter === 'missing' ? blocking : coverage;
+      el['target-shortage-list'].innerHTML='';
+      for (const item of blocking) document.querySelector(`#bom-rows tr[data-row="${item.row.row}"]`)?.classList.add('target-shortage');
+      for (const item of visible) {
+        const card=document.createElement('div'); card.className='shortage-item';
+        const part=document.createElement('div'); part.className='shortage-part';
+        const name=document.createElement('strong'); name.textContent=[item.row.designators,item.row.comment || item.row.footprint].filter(Boolean).join(' · ') || `BOM row ${item.row.row}`;
+        const need=document.createElement('small'); need.textContent=`Need ${formatStock(item.required)} for ${formatStock(target)} builds · ${item.row.jlcpcb_part || 'No JLC part'}`; part.append(name,need);
+        const exclude=document.createElement('button'); exclude.type='button'; exclude.className='secondary small shortage-exclude';
+        exclude.innerHTML='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12h7"></path></svg><span>Exclude</span>';
+        exclude.setAttribute('aria-label',`Exclude ${item.row.designators || `BOM row ${item.row.row}`} from build calculations`);
+        exclude.addEventListener('click',()=>setCalculationInclusion(item.row.row,false,true));
+        card.append(part,coverageSource(item),exclude);
+        el['target-shortage-list'].appendChild(card);
+      }
+      if (!visible.length) { const ready=document.createElement('div'); ready.className='shortage-source'; ready.textContent=blocking.length ? 'No components match this filter.' : `Every BOM line has enough stock for ${formatStock(target)} builds.`; el['target-shortage-list'].appendChild(ready); }
+      el['target-analysis'].classList.remove('hidden');
+    }
+    function setPlanStatus(element,label,target,blockingCount) {
+      element.className=`plan-status ${blockingCount ? 'short' : 'ready'}`;
+      element.textContent=blockingCount ? `${label}: ${blockingCount} component line${blockingCount === 1 ? '' : 's'} short` : `${label}: ready for ${formatStock(target)}`;
+    }
+    function setTargetFilter(filter) {
+      state.targetFilter=filter;
+      el['target-filter-all'].setAttribute('aria-pressed',String(filter === 'all'));
+      el['target-filter-missing'].setAttribute('aria-pressed',String(filter === 'missing'));
+      updateTargetAnalysis();
+    }
+    function coverageSource(item) {
+      const source=document.createElement('div'); source.className=`shortage-source ${item.shortage > 0 ? 'missing' : ''}`;
+      const heading=document.createElement('strong'); heading.textContent=item.shortage > 0 ? 'Missing' : 'Covered';
+      const detail=document.createElement('span');
+      if (item.shortage > 0 && item.combinedAvailable <= 0) detail.textContent=`Missing all ${formatStock(item.required)} · 0 available`;
+      else if (item.shortage > 0) detail.textContent=`${formatStock(item.shortage)} short · ${formatStock(item.combinedAvailable)} available across all sources`;
+      else if (item.localAvailable >= item.required) detail.textContent=`Ready from local stock · ${formatStock(item.localAvailable)} available`;
+      else if (item.externalAvailable >= item.required) detail.textContent=`Ready from external stock · ${formatStock(item.externalAvailable)} available`;
+      else detail.textContent=`Ready using local + external · ${formatStock(item.combinedAvailable)} combined`;
+      source.append(heading,detail); return source;
     }
     function stockNumber(value) { const number=Number(value ?? 0); return Number.isFinite(number) ? number : 0; }
     function formatStock(value) { return new Intl.NumberFormat(undefined,{maximumFractionDigits:4}).format(value); }
+    async function copyToClipboard(value,label='Value') {
+      if (!value) throw new Error(`There is no ${label.toLowerCase()} to copy`);
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(value);
+      else {
+        const textarea=document.createElement('textarea'); textarea.value=value; textarea.setAttribute('readonly','');
+        textarea.style.position='fixed'; textarea.style.opacity='0'; document.body.appendChild(textarea); textarea.select();
+        const copied=document.execCommand('copy'); textarea.remove(); if (!copied) throw new Error('Your browser blocked clipboard access');
+      }
+      notify(`${value} copied to the clipboard.`, 'success', `${label} Copied`);
+    }
     function openPartDialog(rowNumber) {
       state.activeRow = rowNumber;
       const row = state.preview.rows.find(item => item.row === rowNumber);
       el['part-query'].value = row.jlcpcb_part || row.comment || '';
       el['part-results'].innerHTML = '';
-      el['part-dialog'].showModal(); searchParts().catch(error => showError(error, 'Part Search Failed'));
+      el['part-dialog'].showModal();
+      window.requestAnimationFrame(()=>el['part-query'].focus({preventScroll:true}));
+      searchParts().catch(error => showError(error, 'Part Search Failed'));
     }
     async function searchParts() {
       const query=el['part-query'].value.trim(); if (query.length < 2) throw new Error('Enter at least two search characters');
@@ -771,13 +1030,15 @@
       try {
         const result=await getJson(`parts/?q=${encodeURIComponent(query)}`); el['part-results'].innerHTML='';
         for (const part of result.parts || []) {
-          const item=document.createElement('div'); item.className='result'; item.setAttribute('role', 'listitem');
-          const copy=document.createElement('div'); const name=document.createElement('strong'); name.textContent=part.label;
-          const meta=document.createElement('small'); meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
-          const choose=document.createElement('button'); choose.type='button'; choose.className='small'; choose.textContent='Select Part';
-          choose.addEventListener('click',()=>choosePart(part)); item.append(copy,choose); el['part-results'].appendChild(item);
+          const item=document.createElement('button'); item.type='button'; item.className='result';
+          const copy=document.createElement('span'); copy.className='result-copy';
+          const name=document.createElement('span'); name.className='result-name'; name.textContent=part.label;
+          const meta=document.createElement('span'); meta.className='result-meta'; meta.textContent=[part.ipn,part.category,part.description].filter(Boolean).join(' · '); copy.append(name,meta);
+          const arrow=document.createElementNS('http://www.w3.org/2000/svg','svg'); arrow.classList.add('icon','result-arrow'); arrow.setAttribute('viewBox','0 0 24 24'); arrow.setAttribute('aria-hidden','true');
+          const arrowPath=document.createElementNS('http://www.w3.org/2000/svg','path'); arrowPath.setAttribute('d','m9 18 6-6-6-6'); arrow.appendChild(arrowPath);
+          item.setAttribute('aria-label',`Select ${part.label}`); item.addEventListener('click',()=>choosePart(part)); item.append(copy,arrow); el['part-results'].appendChild(item);
         }
-        if (!(result.parts || []).length) el['part-results'].textContent='No parts found. Try a name, IPN, JLC SKU, or manufacturer MPN.';
+        if (!(result.parts || []).length) { const empty=document.createElement('div'); empty.className='command-empty'; empty.textContent='No parts found. Try a name, IPN, JLC SKU, or manufacturer MPN.'; el['part-results'].appendChild(empty); }
       } finally {
         hideLoading();
         button.disabled = false;
@@ -851,6 +1112,18 @@
       if (!document.getElementById('assembly-combobox').contains(event.target)) setAssemblyOptionsOpen(false);
     });
     el.preview.addEventListener('click',()=>preview().catch(error=>showError(error, 'BOM Preview Failed')));
+    el['build-target'].addEventListener('input',updateTargetAnalysis);
+    el['target-filter-all'].addEventListener('click',()=>setTargetFilter('all'));
+    el['target-filter-missing'].addEventListener('click',()=>setTargetFilter('missing'));
+    el['reset-calculation-exclusions'].addEventListener('click',()=>{
+      state.calculationExclusions.clear();
+      document.querySelectorAll('#bom-rows .calculation-toggle').forEach(toggle=>{
+        toggle.checked=true;
+        toggle.closest('tr').classList.remove('calculation-excluded');
+        toggle.closest('tr').title='';
+      });
+      updateBuildCalculations();
+    });
     el['test-connection'].addEventListener('click',()=>testConnection().catch(error=>showError(error, 'Connection Test Failed')));
     el['sync-stock'].addEventListener('click',()=>syncStock().catch(error=>showError(error, 'Stock Sync Failed')));
     el['part-search'].addEventListener('click',()=>searchParts().catch(error=>showError(error, 'Part Search Failed')));
