@@ -44,12 +44,15 @@
     #message { white-space: pre-wrap; }
     .error { color: #a72b2b; }
     .success { color: #12643b; }
+    .row-action { min-width: 115px; }
+    .row-action small { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+    .row-action button { white-space: nowrap; }
   </style>
 </head>
 <body>
 <main>
   <h1>JLC Part Catalogue Import</h1>
-  <p class="muted">Upload a DipTrace CSV/XLSX file. Preview checks every JLCPCB C-code against the spreadsheet manufacturer number and existing InvenTree records. Mismatches need explicit review. Nothing is saved until you apply the reviewed import.</p>
+  <p class="muted">Upload a DipTrace CSV/XLSX file. Preview checks every JLCPCB C-code against the spreadsheet manufacturer number and existing InvenTree records. Mismatches need explicit review. Save items individually as you finish them, or apply approved rows together.</p>
   <section class="card">
     <div class="toolbar">
       <label for="file">BOM file</label>
@@ -60,13 +63,13 @@
   <section id="review" class="card" hidden>
     <h2>Review</h2>
     <p id="summary"></p>
-    <p class="muted">For each new Part, choose or create a category. When MPNs differ, search for the spreadsheet MPN's manufacturer or type a new name, then confirm interchangeability. The importer saves the JLCPCB link automatically. Enter an optional link for the spreadsheet manufacturer MPN; existing non-empty links are not overwritten.</p>
+    <p class="muted">For each new Part, choose or create a category. When MPNs differ, search for the spreadsheet MPN's manufacturer or type a new name, then confirm interchangeability. The importer saves the JLCPCB link automatically. Enter an optional link for the spreadsheet manufacturer MPN; existing non-empty links are not overwritten. Unsaved entries stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th></tr></thead>
+      <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th><th>Action</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <p><button id="apply" type="button">Apply approved rows</button></p>
-    <p class="muted">Applying rechecks the JLC pages and InvenTree records. Unapproved mismatches, missing categories and conflicting records stay skipped. Applying the same file again does not create duplicate catalogue records.</p>
+    <p class="muted">Each save rechecks that item and refreshes the review, including newly created manufacturers and categories. Unapproved mismatches, missing categories and conflicting records stay skipped. Reimporting the same file does not create duplicate catalogue records.</p>
   </section>
   <section id="message" class="card" role="status" aria-live="polite" hidden></section>
 </main>
@@ -81,6 +84,8 @@
   const message = document.getElementById('message');
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   let current = null;
+  let draftKey = null;
+  let busy = false;
 
   function show(text, kind = '') {
     message.hidden = false;
@@ -196,7 +201,7 @@
           : name === jlcName ? 'Choose the spreadsheet MPN maker, not the JLC maker.'
           : needsMark ? `Existing company “${existing.name}” needs the Manufacturer flag.`
           : existing ? `Existing manufacturer “${existing.name}” will be reused.`
-          : `New manufacturer “${input.value.trim()}” will be created on apply.`;
+          : `New manufacturer “${input.value.trim()}” will be created on save.`;
       }
       input.addEventListener('input', updateHint); updateHint();
       const label = document.createElement('label'); label.className = 'confirmation';
@@ -214,11 +219,81 @@
     }
     td.appendChild(wrap); tr.appendChild(td);
   }
-  function render(data) {
+  function choicesFor(tr) {
+    const category = tr.querySelector('.category');
+    const manufacturer = tr.querySelector('.manufacturer-choice');
+    return {
+      category: category ? {
+        existing_id: category.querySelector('.existing').value,
+        new_name: category.querySelector('.new-name').value.trim(),
+        parent_id: category.querySelector('.parent').value,
+      } : null,
+      manufacturer: manufacturer ? {
+        new_name: manufacturer.querySelector('.manufacturer-input')?.value.trim() || '',
+        confirm: manufacturer.querySelector('.confirm-equivalent')?.checked || false,
+        mark_sheet_manufacturer: manufacturer.querySelector('.mark-sheet-manufacturer')?.checked || false,
+        mark_jlc_manufacturer: manufacturer.querySelector('.mark-jlc-manufacturer')?.checked || false,
+      } : null,
+      sheet_link: tr.querySelector('.sheet-link')?.value.trim() || '',
+    };
+  }
+  function loadDraft() {
+    try { return JSON.parse(localStorage.getItem(draftKey) || '{}'); }
+    catch { return {}; }
+  }
+  function storeDraft(draft) {
+    if (!draftKey) return;
+    try { localStorage.setItem(draftKey, JSON.stringify(draft)); }
+    catch { show('Browser draft storage is unavailable; save each item before leaving this page.', 'error'); }
+  }
+  function persistDraft() {
+    if (!draftKey || !current) return;
+    const draft = {};
+    for (const tr of rows.querySelectorAll('tr[data-row]')) {
+      if (tr.dataset.saved !== 'true') draft[tr.dataset.row] = choicesFor(tr);
+    }
+    storeDraft(draft);
+  }
+  function restoreChoices(tr, choice) {
+    if (!choice || typeof choice !== 'object') return;
+    const category = tr.querySelector('.category');
+    if (category && choice.category) {
+      const saved = choice.category;
+      let existingId = saved.existing_id || '';
+      let newName = saved.new_name || '';
+      if (newName) {
+        const found = current.categories.find(item => !item.structural
+          && item.name.toLocaleLowerCase() === newName.toLocaleLowerCase()
+          && String(item.parent_id || '') === String(saved.parent_id || ''));
+        if (found) { existingId = String(found.pk); newName = ''; }
+      }
+      const existing = category.querySelector('.existing');
+      if ([...existing.options].some(option => option.value === String(existingId))) existing.value = existingId;
+      category.querySelector('.new-name').value = newName;
+      const parent = category.querySelector('.parent');
+      if ([...parent.options].some(option => option.value === String(saved.parent_id || ''))) parent.value = saved.parent_id || '';
+    }
+    const manufacturer = tr.querySelector('.manufacturer-choice');
+    if (manufacturer && choice.manufacturer) {
+      const saved = choice.manufacturer;
+      const input = manufacturer.querySelector('.manufacturer-input');
+      if (input) { input.value = saved.new_name || ''; input.dispatchEvent(new Event('input')); }
+      const confirm = manufacturer.querySelector('.confirm-equivalent');
+      if (confirm) confirm.checked = Boolean(saved.confirm);
+      const markSheet = manufacturer.querySelector('.mark-sheet-manufacturer');
+      if (markSheet && !markSheet.parentElement.hidden) markSheet.checked = Boolean(saved.mark_sheet_manufacturer);
+      const markJlc = manufacturer.querySelector('.mark-jlc-manufacturer');
+      if (markJlc) markJlc.checked = Boolean(saved.mark_jlc_manufacturer);
+    }
+    const link = tr.querySelector('.sheet-link');
+    if (link) link.value = choice.sheet_link || '';
+  }
+  function render(data, draft = {}) {
     current = data; rows.replaceChildren(); review.hidden = false;
     summary.textContent = `${data.summary.total} rows · ${data.summary.ready} ready · ${data.summary.review} need review · ${data.summary.complete} already complete · ${data.summary.blocked} blocked`;
     for (const item of data.rows) {
-      const tr = document.createElement('tr');
+      const tr = document.createElement('tr'); tr.dataset.row = item.row.row;
+      tr.dataset.saved = item.status === 'complete' ? 'true' : 'false';
       cell(tr, item.row.designators);
       cell(tr, item.row.jlcpcb_part);
       const sheetCell = copyCell(tr, item.row.footprint, 'Sheet Footprint / MPN');
@@ -238,59 +313,106 @@
       manufacturerControls(tr, item);
       if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item.row.row);
       else cell(tr, item.part ? `Existing Part: ${item.part.name}` : '—');
-      rows.appendChild(tr);
+      const action = document.createElement('td'); action.className = 'row-action';
+      if (item.status === 'ready' || item.status === 'review') {
+        const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Save this item';
+        button.className = 'save-item'; button.setAttribute('aria-label', `Save row ${item.row.row}, ${item.row.jlcpcb_part}`);
+        action.appendChild(button);
+      } else action.textContent = item.status === 'complete' ? 'Saved' : 'Blocked';
+      tr.appendChild(action); rows.appendChild(tr);
+      restoreChoices(tr, draft[String(item.row.row)]);
     }
+    persistDraft();
+  }
+  function collectPayload(rowNumber = null) {
+    const categories = {}, manufacturers = {}, sheet_links = {};
+    for (const tr of rows.querySelectorAll('tr[data-row]')) {
+      if (tr.dataset.saved === 'true' || (rowNumber !== null && tr.dataset.row !== String(rowNumber))) continue;
+      const choice = choicesFor(tr);
+      if (choice.category) categories[tr.dataset.row] = choice.category;
+      if (choice.manufacturer) manufacturers[tr.dataset.row] = choice.manufacturer;
+      if (tr.querySelector('.sheet-link')) sheet_links[tr.dataset.row] = choice.sheet_link;
+    }
+    return {preview_token: current.preview_token, categories, manufacturers, sheet_links,
+      ...(rowNumber === null ? {} : {row_number: Number(rowNumber)})};
+  }
+  async function fileKey(selected) {
+    if (window.crypto?.subtle) {
+      const digest = await crypto.subtle.digest('SHA-256', await selected.arrayBuffer());
+      return `diptrace-catalogue-draft-v1:${[...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
+    }
+    return `diptrace-catalogue-draft-v1:${selected.name}:${selected.size}:${selected.lastModified}`;
+  }
+  async function previewFile() {
+    const form = new FormData(); form.append('file', file.files[0]);
+    return responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
+  }
+  function setBusy(value) {
+    busy = value; previewButton.disabled = value; applyButton.disabled = value;
+    for (const button of rows.querySelectorAll('.save-item')) button.disabled = value;
+  }
+  function resultText(data) {
+    return [
+      `${data.created_parts} Parts, ${data.created_categories} categories, ${data.created_manufacturers} manufacturers and ${data.created_supplier} JLCPCB supplier created; ${data.promoted_manufacturers} existing companies marked as manufacturers.`,
+      `${data.created_mpn} Manufacturer Parts, ${data.created_sku} Supplier Parts and ${data.created_package} Package parameters created; ${data.updated_links} blank links filled.`,
+      `${data.existing} rows already complete; ${data.skipped.length} skipped.`,
+      ...data.skipped.map(item => `${item.code}: ${item.reason}`),
+    ].join('\n');
   }
   previewButton.addEventListener('click', async () => {
+    if (busy) return;
     if (!file.files.length) return show('Select a CSV or XLSX file first.', 'error');
-    previewButton.disabled = true; review.hidden = true; current = null;
+    persistDraft(); setBusy(true);
     show('Checking JLCPCB pages and InvenTree records…');
     try {
-      const form = new FormData(); form.append('file', file.files[0]);
-      const data = await responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
-      render(data); show('Preview ready. Review mismatches, blocked rows and category choices before applying.', 'success');
+      draftKey = await fileKey(file.files[0]);
+      const data = await previewFile();
+      render(data, loadDraft());
+      show('Preview ready. Save each item as you resolve it, or apply approved rows together.', 'success');
     } catch (error) { show(error.message, 'error'); }
-    finally { previewButton.disabled = false; }
+    finally { setBusy(false); }
   });
-  applyButton.addEventListener('click', async () => {
-    if (!current) return;
-    if (!window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
-    const categories = {};
-    const manufacturers = {};
-    const sheet_links = {};
-    for (const wrap of document.querySelectorAll('.category')) {
-      categories[wrap.dataset.row] = {
-        existing_id: wrap.querySelector('.existing').value,
-        new_name: wrap.querySelector('.new-name').value.trim(),
-        parent_id: wrap.querySelector('.parent').value,
-      };
-    }
-    for (const wrap of document.querySelectorAll('.manufacturer-choice')) {
-      manufacturers[wrap.dataset.row] = {
-        new_name: wrap.querySelector('.manufacturer-input')?.value.trim() || '',
-        confirm: wrap.querySelector('.confirm-equivalent')?.checked || false,
-        mark_sheet_manufacturer: wrap.querySelector('.mark-sheet-manufacturer')?.checked || false,
-        mark_jlc_manufacturer: wrap.querySelector('.mark-jlc-manufacturer')?.checked || false,
-      };
-    }
-    for (const input of document.querySelectorAll('.sheet-link')) sheet_links[input.dataset.row] = input.value.trim();
-    applyButton.disabled = true; show('Rechecking source pages and saving catalogue records…');
+  rows.addEventListener('input', persistDraft);
+  rows.addEventListener('change', persistDraft);
+  async function applyRows(rowNumber = null) {
+    if (busy || !current) return;
+    if (rowNumber === null && !window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
+    persistDraft();
+    const payload = collectPayload(rowNumber);
+    setBusy(true); show('Rechecking source pages and saving catalogue records…');
     try {
       const data = await responseJson(await fetch('apply/', {
         method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
-        body: JSON.stringify({preview_token: current.preview_token, categories, manufacturers, sheet_links}),
+        body: JSON.stringify(payload),
       }));
-      const lines = [
-        `${data.created_parts} Parts, ${data.created_categories} categories, ${data.created_manufacturers} manufacturers and ${data.created_supplier} JLCPCB supplier created; ${data.promoted_manufacturers} existing companies marked as manufacturers.`,
-        `${data.created_mpn} Manufacturer Parts, ${data.created_sku} Supplier Parts and ${data.created_package} Package parameters created; ${data.updated_links} blank links filled.`,
-        `${data.existing} rows already complete; ${data.skipped.length} skipped.`,
-        ...data.skipped.map(item => `${item.code}: ${item.reason}`),
-      ];
-      show(lines.join('\n'), 'success');
-      if (!data.skipped.length) { current = null; review.hidden = true; }
+      const saved = new Set(data.saved_rows.map(String));
+      const draft = loadDraft();
+      for (const row of saved) delete draft[row];
+      storeDraft(draft);
+      if (saved.size) {
+        try {
+          const refreshed = await previewFile();
+          render(refreshed, loadDraft());
+          show(`${resultText(data)}\nReview refreshed with the latest categories and manufacturers.`, 'success');
+        } catch (error) {
+          for (const row of saved) {
+            const tr = [...rows.querySelectorAll('tr[data-row]')].find(item => item.dataset.row === row);
+            if (!tr) continue;
+            tr.dataset.saved = 'true';
+            for (const input of tr.querySelectorAll('input, select')) input.disabled = true;
+            const button = tr.querySelector('.save-item'); if (button) button.replaceWith('Saved');
+          }
+          show(`${resultText(data)}\nSaved successfully, but review refresh failed: ${error.message}. Preview the file again for current choices.`, 'error');
+        }
+      } else show(resultText(data), data.skipped.length ? 'error' : 'success');
     } catch (error) { show(error.message, 'error'); }
-    finally { applyButton.disabled = false; }
+    finally { setBusy(false); }
+  }
+  rows.addEventListener('click', event => {
+    const button = event.target.closest('.save-item');
+    if (button) applyRows(button.closest('tr').dataset.row);
   });
+  applyButton.addEventListener('click', () => applyRows());
 })();
 </script>
 </body>

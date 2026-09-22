@@ -185,6 +185,20 @@ class CatalogueImportService:
                         result.update(self._plan_product(product))
                         needs_sheet = bool(mismatch)
                         result["needs_sheet_manufacturer"] = needs_sheet
+                        if needs_sheet and result["part"] and result["status"] == "complete":
+                            # A previous import may already have attached the interchangeable
+                            # sheet MPN to this same Part. Do not demand approval again.
+                            from company.models import ManufacturerPart
+                            sheet_parts = list(ManufacturerPart.objects.filter(
+                                part_id=result["part"]["pk"], MPN__iexact=str(row["footprint"]).strip()
+                            ).select_related("manufacturer")[:2])
+                            if (len(sheet_parts) == 1 and sheet_parts[0].manufacturer.is_manufacturer
+                                    and normalize_identifier(sheet_parts[0].manufacturer.name)
+                                    != normalize_identifier(product.manufacturer)):
+                                result["needs_sheet_manufacturer"] = False
+                                result["reason"] = "Both manufacturer numbers already exist on this Part"
+                                results.append(result)
+                                continue
                         if needs_sheet and (result["status"] != "blocked" or result["reason"] == "Existing Part has a different Manufacturer Part; resolve its identity manually"):
                             if result["status"] == "blocked":
                                 result["needs_category"] = True
@@ -196,7 +210,8 @@ class CatalogueImportService:
             results.append(result)
 
         categories = [
-            {"pk": category.pk, "name": category.name, "path": category.pathstring, "structural": category.structural}
+            {"pk": category.pk, "name": category.name, "path": category.pathstring,
+             "parent_id": category.parent_id, "structural": category.structural}
             for category in PartCategory.objects.all().order_by("name")
         ]
         return {
@@ -298,7 +313,7 @@ class CatalogueImportService:
 
     def apply(self, rows: list[dict], category_ids: dict, manufacturer_choices: dict,
               sheet_links: dict,
-              reviewed_mpns: dict, reviewed_manufacturers: dict, user) -> dict:
+              reviewed_mpns: dict, reviewed_manufacturers: dict, user, only_row=None) -> dict:
         """Re-fetch source facts and re-plan inside one transaction before writing."""
         from common.models import Parameter, ParameterTemplate
         from company.models import Company, ManufacturerPart, SupplierPart
@@ -309,6 +324,7 @@ class CatalogueImportService:
 
         if not getattr(user, "is_superuser", False):
             raise CatalogueError("A superuser is required to apply catalogue imports")
+        rows = _select_apply_rows(rows, only_row)
         # Network lookups finish before opening the database transaction.
         # Source identities are fetched again here, independent of the signed preview.
         preview = self.preview(rows)
@@ -317,7 +333,7 @@ class CatalogueImportService:
             output = {"created_parts": 0, "created_categories": 0, "created_manufacturers": 0,
                       "promoted_manufacturers": 0, "created_supplier": 0,
                       "created_mpn": 0, "created_sku": 0, "created_package": 0, "updated_links": 0,
-                      "existing": 0, "skipped": []}
+                      "existing": 0, "saved_rows": [], "skipped": []}
             for item in preview["rows"]:
                 row = item["row"]
                 code = str(row.get("jlcpcb_part") or "").upper()
@@ -356,6 +372,7 @@ class CatalogueImportService:
                     continue
                 if fresh["status"] == "complete":
                     output["existing"] += 1
+                    output["saved_rows"].append(row["row"])
                     continue
                 category = None
                 if fresh["needs_category"]:
@@ -474,6 +491,7 @@ class CatalogueImportService:
                     parameter.full_clean()
                     parameter.save()
                     output["created_package"] += 1
+                output["saved_rows"].append(row["row"])
             return output
 
 
@@ -559,6 +577,22 @@ def _conflicting_codes(rows: list[dict]) -> set[str]:
             conflicts.add(code)
         seen.setdefault(code, mpn)
     return conflicts
+
+
+def _select_apply_rows(rows: list[dict], only_row) -> list[dict]:
+    """Select one signed BOM line, retaining full-file C-code conflict checks."""
+    if only_row is None:
+        return rows
+    try:
+        selected = int(only_row)
+    except (TypeError, ValueError) as exc:
+        raise CatalogueError("Invalid selected BOM row") from exc
+    matching = [row for row in rows if row.get("row") == selected]
+    if len(matching) != 1:
+        raise CatalogueError("Selected BOM row is missing or ambiguous")
+    if str(matching[0].get("jlcpcb_part") or "").upper() in _conflicting_codes(rows):
+        raise CatalogueError("The selected JLCPCB code has conflicting manufacturer numbers in this file")
+    return matching
 
 
 def _company_metadata(record: dict, manufacturer_name: str) -> dict[str, str]:

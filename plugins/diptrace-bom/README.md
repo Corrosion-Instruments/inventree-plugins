@@ -38,6 +38,14 @@ company fields are retained.
 The preview is read-only. Applying re-fetches and rechecks the source and local
 records inside a database transaction, skips blocked or unapproved rows, and reuses existing
 Company, Part, Manufacturer Part, Supplier Part and Package-parameter records.
+Use **Save this item** to apply a single reviewed row without finishing the rest
+of the file; **Apply approved rows** still processes the batch. A successful
+save re-previews the file, so new companies and categories become available in
+the remaining rows. Unsaved row choices are kept in this browser, keyed to the
+file contents; after a page refresh, select the same file and preview it again
+to restore them. Saved records persist in InvenTree, and completed rows show
+as complete on a fresh preview. Browser storage is a convenience, not a server
+backup; a different browser or cleared site storage will not retain drafts.
 The JLCPCB C-code is stored as the Supplier Part SKU; the manufacturer number
 is stored as the Manufacturer Part MPN. The part-page description is used for
 new records and fills an empty existing Part description without replacing a

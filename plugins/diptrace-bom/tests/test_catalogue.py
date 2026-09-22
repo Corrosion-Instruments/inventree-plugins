@@ -8,6 +8,7 @@ from inventree_diptrace_bom.catalogue import (
     _company_metadata,
     _conflicting_codes,
     _is_jlcpcb_name,
+    _select_apply_rows,
     _validate_manufacturer_choice,
     compare_row,
     parse_jlc_page,
@@ -70,6 +71,22 @@ class CatalogueTests(unittest.TestCase):
         )
         rows = [row.as_dict() for row in parse_bom(io.BytesIO(source.encode()), "bom.csv")]
         self.assertIn("C4353654", _conflicting_codes(rows))
+
+    def test_row_save_selects_one_line_and_rejects_full_file_conflicts(self):
+        rows = [
+            {"row": 2, "jlcpcb_part": "C1546", "footprint": "AAA"},
+            {"row": 3, "jlcpcb_part": "C2167623", "footprint": "BBB"},
+        ]
+        self.assertEqual(_select_apply_rows(rows, 3), [rows[1]])
+        self.assertIs(_select_apply_rows(rows, None), rows)
+        with self.assertRaisesRegex(CatalogueError, "missing or ambiguous"):
+            _select_apply_rows(rows, 4)
+        with self.assertRaisesRegex(CatalogueError, "Invalid selected"):
+            _select_apply_rows(rows, "oops")
+        rows.append({"row": 4, "jlcpcb_part": "C1546", "footprint": "DIFFERENT"})
+        with self.assertRaisesRegex(CatalogueError, "conflicting manufacturer numbers"):
+            _select_apply_rows(rows, 2)
+        self.assertEqual(_select_apply_rows(rows, 3), [rows[1]])
 
     def test_company_metadata_is_optional_and_company_specific(self):
         record = {

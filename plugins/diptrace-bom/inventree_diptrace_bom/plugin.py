@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.5.4"
+    VERSION = "0.5.5"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -230,7 +230,7 @@ class DipTraceBomPlugin(
                 raise CatalogueError("Invalid catalogue preview data")
             result = self._catalogue_service().apply(
                 preview["rows"], category_ids, manufacturer_choices, sheet_links, reviewed_mpns,
-                reviewed_manufacturers, request.user
+                reviewed_manufacturers, request.user, only_row=data.get("row_number")
             )
             return JsonResponse(result)
         except signing.SignatureExpired:
