@@ -51,7 +51,7 @@
   <section id="review" class="card" hidden>
     <h2>Review</h2>
     <p id="summary"></p>
-    <p class="muted">For each new Part, choose or create a category. When the spreadsheet and JLCPCB MPNs differ, select or create the spreadsheet MPN's manufacturer and confirm interchangeability. Both manufacturer MPNs will belong to the same InvenTree Part; the JLCPCB supplier SKU will link to the JLCPCB manufacturer MPN.</p>
+    <p class="muted">For each new Part, choose or create a category. When the spreadsheet and JLCPCB MPNs differ, search for the spreadsheet MPN's manufacturer or type a new name in the same field, then confirm interchangeability. The JLCPCB manufacturer is handled automatically. Both manufacturer MPNs will belong to the same InvenTree Part; the JLCPCB supplier SKU will link to the JLCPCB manufacturer MPN.</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th></tr></thead>
       <tbody id="rows"></tbody>
@@ -116,24 +116,32 @@
     const rowNumber = item.row.row;
     const td = document.createElement('td');
     const wrap = document.createElement('div'); wrap.className = 'manufacturer-choice'; wrap.dataset.row = rowNumber;
-    const existing = document.createElement('select'); existing.className = 'existing-manufacturer';
-    existing.setAttribute('aria-label', `Spreadsheet MPN manufacturer for row ${rowNumber}`);
-    existing.appendChild(option('', 'Choose existing manufacturer'));
+    const input = document.createElement('input'); input.type = 'text'; input.maxLength = 100;
+    input.className = 'manufacturer-input'; input.placeholder = 'Search or create manufacturer';
+    input.setAttribute('aria-label', `Manufacturer of spreadsheet MPN ${item.row.footprint} on row ${rowNumber}`);
+    const list = document.createElement('datalist'); list.id = `manufacturer-options-${rowNumber}`;
+    input.setAttribute('list', list.id);
+    const normalize = value => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    const jlcName = normalize(item.product.manufacturer);
     for (const company of current.manufacturers) {
-      if (company.name.toLocaleLowerCase() !== item.product.manufacturer.toLocaleLowerCase()) {
-        existing.appendChild(option(company.pk, company.name));
-      }
+      if (normalize(company.name) !== jlcName) list.appendChild(option(company.name, company.name));
     }
-    const newName = document.createElement('input'); newName.type = 'text'; newName.maxLength = 100;
-    newName.className = 'new-manufacturer'; newName.placeholder = 'Or create manufacturer name';
-    newName.setAttribute('aria-label', `New spreadsheet manufacturer for row ${rowNumber}`);
-    existing.addEventListener('change', () => { if (existing.value) newName.value = ''; });
-    newName.addEventListener('input', () => { if (newName.value.trim()) existing.value = ''; });
+    const hint = document.createElement('small'); hint.id = `manufacturer-hint-${rowNumber}`;
+    input.setAttribute('aria-describedby', hint.id);
+    function updateHint() {
+      const name = normalize(input.value);
+      const existing = current.manufacturers.find(company => normalize(company.name) === name);
+      hint.textContent = !name ? `For sheet MPN ${item.row.footprint}; JLC maker is automatic.`
+        : name === jlcName ? 'Choose the spreadsheet MPN maker, not the JLC maker.'
+        : existing ? `Existing manufacturer “${existing.name}” will be reused.`
+        : `New manufacturer “${input.value.trim()}” will be created on apply.`;
+    }
+    input.addEventListener('input', updateHint); updateHint();
     const label = document.createElement('label'); label.className = 'confirmation';
     const confirm = document.createElement('input'); confirm.type = 'checkbox'; confirm.className = 'confirm-equivalent';
     confirm.setAttribute('aria-label', `Confirm interchangeability for row ${rowNumber}`);
     label.append(confirm, document.createTextNode('I confirm these two MPNs are fully interchangeable.'));
-    wrap.append(existing, newName, label);
+    wrap.append(input, list, hint, label);
     td.appendChild(wrap); tr.appendChild(td);
   }
   function render(data) {
@@ -180,8 +188,7 @@
     }
     for (const wrap of document.querySelectorAll('.manufacturer-choice')) {
       manufacturers[wrap.dataset.row] = {
-        existing_id: wrap.querySelector('.existing-manufacturer').value,
-        new_name: wrap.querySelector('.new-manufacturer').value.trim(),
+        new_name: wrap.querySelector('.manufacturer-input').value.trim(),
         confirm: wrap.querySelector('.confirm-equivalent').checked,
       };
     }

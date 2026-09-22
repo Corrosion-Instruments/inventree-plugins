@@ -20,8 +20,9 @@ this workflow, not as a PCB land-pattern value.
 The catalogue importer reads the public JLCPCB part-detail pages. Exact matches
 between each page's `MFR.Part #` and the CSV `Footprint` value (ignoring only
 case and incidental whitespace) are ready automatically. Mismatches require
-the operator to select or create the manufacturer for the spreadsheet MPN and
-explicitly confirm that it is fully interchangeable with the JLCPCB MPN.
+the operator to search for an existing manufacturer or type a new manufacturer
+name for the spreadsheet MPN in one field, then explicitly confirm that it is
+fully interchangeable with the JLCPCB MPN.
 The importer then adds both Manufacturer Part records to one internal Part;
 the JLCPCB C-code Supplier Part links to the JLCPCB Manufacturer Part. It does
 not infer the spreadsheet manufacturer's name from JLCPCB. Missing pages,
