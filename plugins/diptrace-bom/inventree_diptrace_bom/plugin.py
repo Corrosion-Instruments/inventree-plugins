@@ -22,7 +22,7 @@ from plugin.mixins import (
     UserInterfaceMixin,
 )
 
-from .catalogue import CatalogueError, CatalogueImportService
+from .catalogue import CatalogueError, CatalogueImportService, apply_sheet_mpn_overrides
 from .jlcpcb import JlcApiError, JlcClient
 from .parser import BomParseError, parse_bom
 from .services import BomImportError, BomImportService
@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.5.7"
+    VERSION = "0.5.8"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -182,6 +182,11 @@ class DipTraceBomPlugin(
             return JsonResponse({"error": "BOM file exceeds 10 MB"}, status=400)
         try:
             rows = [row.as_dict() for row in parse_bom(uploaded, uploaded.name)]
+            try:
+                overrides = json.loads(request.POST.get("mpn_overrides", "{}"))
+            except json.JSONDecodeError as exc:
+                raise CatalogueError("Invalid spreadsheet MPN edits") from exc
+            rows = apply_sheet_mpn_overrides(rows, overrides)
             result = self._catalogue_service().preview(rows)
             result["preview_token"] = signing.dumps(
                 {

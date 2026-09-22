@@ -43,6 +43,28 @@ def normalize_identifier(value: str) -> str:
     return " ".join(str(value or "").split()).casefold()
 
 
+def reviewed_sheet_mpn(row: dict) -> str:
+    """Use the reviewed MPN without altering the engineer's original Footprint."""
+    return str(row.get("sheet_mpn", row.get("footprint")) or "").strip()
+
+
+def apply_sheet_mpn_overrides(rows: list[dict], overrides: dict) -> list[dict]:
+    """Apply explicit row edits before preview and sign the resulting rows."""
+    if not isinstance(overrides, dict):
+        raise CatalogueError("Spreadsheet MPN edits must be keyed by BOM row")
+    known = {str(row["row"]) for row in rows}
+    if set(overrides) - known:
+        raise CatalogueError("Spreadsheet MPN edit refers to a row outside this BOM")
+    edited = []
+    for row in rows:
+        value = overrides.get(str(row["row"]), row.get("sheet_mpn", row.get("footprint")))
+        if (not isinstance(value, str) or (len(value.strip()) > 100
+                                        and value.strip() != str(row.get("footprint") or "").strip())):
+            raise CatalogueError(f"Row {row['row']}: spreadsheet MPN must be at most 100 characters")
+        edited.append({**row, "sheet_mpn": value.strip()})
+    return edited
+
+
 def parse_jlc_page(html: str, code: str) -> JlcPart:
     """Extract the labelled product facts, failing closed if the page changes."""
     if not CODE_RE.fullmatch(code):
@@ -99,11 +121,11 @@ class JlcPageClient:
 
 def compare_row(row: dict, product: JlcPart) -> str | None:
     """Describe a sheet / JLC MPN difference, or return None for a match."""
-    sheet_mpn = str(row.get("footprint") or "").strip()
-    if not sheet_mpn:
-        return "The spreadsheet Footprint / manufacturer part number is blank"
-    if normalize_identifier(sheet_mpn) != normalize_identifier(product.mpn):
-        return f"Spreadsheet Footprint {sheet_mpn!r} differs from JLCPCB MFR Part # {product.mpn!r}"
+    reviewed_mpn = reviewed_sheet_mpn(row)
+    if not reviewed_mpn:
+        return "The spreadsheet MPN is blank; enter it and check again"
+    if normalize_identifier(reviewed_mpn) != normalize_identifier(product.mpn):
+        return f"Spreadsheet MPN {reviewed_mpn!r} differs from JLCPCB MFR Part # {product.mpn!r}"
     return None
 
 
@@ -208,7 +230,9 @@ class CatalogueImportService:
                     product = replace(product, **metadata)
                     result["product"] = product.as_dict()
                     mismatch = compare_row(row, product)
-                    if not str(row.get("footprint") or "").strip():
+                    if len(reviewed_sheet_mpn(row)) > 100:
+                        result["reason"] = "Spreadsheet MPN exceeds 100 characters; edit it and check again"
+                    elif not reviewed_sheet_mpn(row):
                         result["reason"] = mismatch
                     else:
                         result.update(self._plan_product(product))
@@ -219,11 +243,9 @@ class CatalogueImportService:
                             # sheet MPN to this same Part. Do not demand approval again.
                             from company.models import ManufacturerPart
                             sheet_parts = list(ManufacturerPart.objects.filter(
-                                part_id=result["part"]["pk"], MPN__iexact=str(row["footprint"]).strip()
+                                part_id=result["part"]["pk"], MPN__iexact=reviewed_sheet_mpn(row)
                             ).select_related("manufacturer")[:2])
-                            if (len(sheet_parts) == 1 and sheet_parts[0].manufacturer.is_manufacturer
-                                    and normalize_identifier(sheet_parts[0].manufacturer.name)
-                                    != normalize_identifier(product.manufacturer)):
+                            if len(sheet_parts) == 1 and sheet_parts[0].manufacturer.is_manufacturer:
                                 result["needs_sheet_manufacturer"] = False
                                 result["reason"] = "Both manufacturer numbers already exist on this Part"
                                 results.append(result)
@@ -395,7 +417,7 @@ class CatalogueImportService:
                     except CatalogueError as exc:
                         output["skipped"].append({"code": code, "reason": str(exc)})
                         continue
-                    sheet_mpn = str(row["footprint"]).strip()
+                    sheet_mpn = reviewed_sheet_mpn(row)
                 fresh = self._plan_product(product, sheet_mpn, sheet_manufacturer, sheet_link)
                 if fresh["status"] == "blocked":
                     output["skipped"].append({"code": code, "reason": fresh["reason"]})
@@ -467,6 +489,9 @@ class CatalogueImportService:
                     supplier = Company.objects.create(name="JLCPCB", is_supplier=True, active=True)
                     output["created_supplier"] += 1
 
+                if (sheet_manufacturer and normalize_identifier(sheet_manufacturer.name)
+                        == normalize_identifier(manufacturer.name)):
+                    sheet_manufacturer = manufacturer
                 if sheet_manufacturer and sheet_manufacturer.pk is None:
                     sheet_manufacturer.save()
                     output["created_manufacturers"] += 1
@@ -499,7 +524,7 @@ class CatalogueImportService:
                     output["updated_links"] += 1
                 if sheet_manufacturer and sheet_part is None:
                     ManufacturerPart.objects.create(part=part, manufacturer=sheet_manufacturer, MPN=sheet_mpn,
-                                                    description=product.description[:250], link=sheet_link)
+                                                    link=sheet_link)
                     output["created_mpn"] += 1
                 elif sheet_part and sheet_link and not sheet_part.link:
                     sheet_part.link = sheet_link
@@ -564,9 +589,10 @@ def _resolve_sheet_manufacturer(choice: dict, jlc_name: str):
                 manufacturer.full_clean()
             except ValidationError as exc:
                 raise CatalogueError("Spreadsheet manufacturer name is invalid") from exc
-    if normalize_identifier(manufacturer.name) == normalize_identifier(jlc_name):
-        raise CatalogueError("Choose the different manufacturer for the spreadsheet MPN")
-    if not manufacturer.is_manufacturer and choice.get("mark_sheet_manufacturer") is not True:
+    same_jlc_company = normalize_identifier(manufacturer.name) == normalize_identifier(jlc_name)
+    if (not manufacturer.is_manufacturer
+            and choice.get("mark_sheet_manufacturer") is not True
+            and not (same_jlc_company and choice.get("mark_jlc_manufacturer") is True)):
         raise CatalogueError("Confirm marking the existing spreadsheet company as a manufacturer")
     return manufacturer
 
@@ -602,7 +628,7 @@ def _conflicting_codes(rows: list[dict]) -> set[str]:
     conflicts: set[str] = set()
     for row in rows:
         code = str(row.get("jlcpcb_part") or "").upper()
-        mpn = normalize_identifier(row.get("footprint"))
+        mpn = normalize_identifier(reviewed_sheet_mpn(row))
         if code in seen and seen[code] != mpn:
             conflicts.add(code)
         seen.setdefault(code, mpn)

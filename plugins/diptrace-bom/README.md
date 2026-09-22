@@ -14,8 +14,13 @@ This plugin provides a guarded workflow for turning a DipTrace CSV/XLSX export i
 The plugin also provides **JLC Part Catalogue**, a separate page at
 `/plugin/diptrace-bom/catalogue/`. The original BOM importer page is unchanged.
 Upload the same CSV/XLSX format to preview manufacturer and supplier records.
-The `Footprint` column is treated as the expected manufacturer part number for
-this workflow, not as a PCB land-pattern value.
+The original `Footprint` value remains visible and unchanged. Each review row
+has an editable **Spreadsheet MPN** field, initially filled from `Footprint`.
+If DipTrace includes a CAD prefix (for example `RES_0402 - AF0402FR-07100RL`),
+enter the actual MPN (`AF0402FR-07100RL`) in that field and click **Check again**.
+The importer does not guess or strip prefixes. Saving is disabled for an edited
+MPN until it has been rechecked. Edits are retained in this browser for the
+same file and are signed into the checked preview used for saving.
 
 When JLCPCB Open API credentials are configured, the catalogue importer uses
 one batch API lookup for component identity, manufacturer name, package and
@@ -31,11 +36,12 @@ repointed. A missing API description is left blank without fetching the page;
 such a row can still be complete on later previews.
 
 Exact matches
-between JLCPCB's manufacturer number and the CSV `Footprint` value (ignoring only
+between JLCPCB's manufacturer number and the reviewed Spreadsheet MPN (ignoring only
 case and incidental whitespace) are ready automatically. Mismatches require
 the operator to search for an existing manufacturer or type a new manufacturer
 name for the spreadsheet MPN in one field, then explicitly confirm that it is
-fully interchangeable with the JLCPCB MPN.
+fully interchangeable with the JLCPCB MPN. The two MPNs may have the same
+manufacturer; matching manufacturer names do not imply interchangeability.
 The importer then adds both Manufacturer Part records to one internal Part;
 the JLCPCB C-code Supplier Part links to the JLCPCB Manufacturer Part. It does
 not infer the spreadsheet manufacturer's name from JLCPCB. Missing source data,

@@ -1,19 +1,25 @@
 import io
+import sys
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from inventree_diptrace_bom.catalogue import (
     CatalogueError,
     CatalogueImportService,
     JlcPageClient,
     JlcPart,
+    apply_sheet_mpn_overrides,
     _company_metadata,
     _conflicting_codes,
     _is_jlcpcb_name,
+    _resolve_sheet_manufacturer,
     _select_apply_rows,
     _validate_manufacturer_choice,
     compare_row,
     parse_jlc_page,
+    reviewed_sheet_mpn,
     validate_external_link,
 )
 from inventree_diptrace_bom.parser import parse_bom
@@ -117,6 +123,36 @@ class CatalogueTests(unittest.TestCase):
         rows = [row.as_dict() for row in parse_bom(io.BytesIO(source.encode()), "bom.csv")]
         self.assertIn("C4353654", _conflicting_codes(rows))
 
+    def test_editable_sheet_mpn_preserves_raw_diptrace_value(self):
+        original = {"row": 10, "jlcpcb_part": "C106232",
+                    "footprint": "RES_0402 - AF0402FR-07100RL"}
+        edited = apply_sheet_mpn_overrides([original], {"10": " AF0402FR-07100RL "})[0]
+        self.assertEqual(edited["footprint"], original["footprint"])
+        self.assertEqual(edited["sheet_mpn"], "AF0402FR-07100RL")
+        self.assertEqual(reviewed_sheet_mpn(edited), "AF0402FR-07100RL")
+        self.assertEqual(reviewed_sheet_mpn(original), original["footprint"])
+        jlc = JlcPart("C106232", "YAGEO", "RC0402FR-07100RL", "", "0402", "https://jlcpcb.com/partdetail/C106232")
+        self.assertIn("AF0402FR-07100RL", compare_row(edited, jlc))
+        self.assertNotIn("RES_0402", compare_row(edited, jlc))
+        self.assertEqual(original["footprint"], "RES_0402 - AF0402FR-07100RL")
+
+    def test_sheet_mpn_override_validates_row_and_length(self):
+        rows = [{"row": 10, "jlcpcb_part": "C106232", "footprint": "RAW"}]
+        for overrides in ({"11": "OTHER"}, [], {"10": "X" * 101}, {"10": 42}):
+            with self.subTest(overrides=overrides), self.assertRaises(CatalogueError):
+                apply_sheet_mpn_overrides(rows, overrides)
+        self.assertEqual(apply_sheet_mpn_overrides(rows, {})[0]["sheet_mpn"], "RAW")
+        self.assertEqual(apply_sheet_mpn_overrides(rows, {"10": ""})[0]["sheet_mpn"], "")
+        long_raw = [{**rows[0], "footprint": "X" * 101}]
+        self.assertEqual(len(apply_sheet_mpn_overrides(long_raw, {"10": "X" * 101})[0]["sheet_mpn"]), 101)
+
+    def test_conflicting_codes_use_reviewed_mpns(self):
+        rows = [{"row": 2, "jlcpcb_part": "C106232", "footprint": "RES_0402 - RC0402FR-07100RL"},
+                {"row": 3, "jlcpcb_part": "C106232", "footprint": "RC0402FR-07100RL"}]
+        self.assertIn("C106232", _conflicting_codes(rows))
+        edited = apply_sheet_mpn_overrides(rows, {"2": "RC0402FR-07100RL"})
+        self.assertNotIn("C106232", _conflicting_codes(edited))
+
     def test_row_save_selects_one_line_and_rejects_full_file_conflicts(self):
         rows = [
             {"row": 2, "jlcpcb_part": "C1546", "footprint": "AAA"},
@@ -165,6 +201,32 @@ class CatalogueTests(unittest.TestCase):
     def test_alternate_mpn_rejects_invalid_manufacturer_id(self):
         with self.assertRaisesRegex(CatalogueError, "ID is invalid"):
             _validate_manufacturer_choice({"confirm": True, "existing_id": "not-an-id"})
+
+    def test_same_manufacturer_mismatch_can_be_confirmed(self):
+        company = types.SimpleNamespace(pk=7, name="YAGEO", is_manufacturer=True)
+
+        class Query:
+            def first(self):
+                return company
+
+        class Manager:
+            def filter(self, **kwargs):
+                self_pk = kwargs.get("pk")
+                self_name = kwargs.get("name__iexact")
+                assert self_pk == 7 or self_name == "YAGEO"
+                return Query()
+
+        company_models = types.ModuleType("company.models")
+        company_models.Company = types.SimpleNamespace(objects=Manager())
+        exceptions = types.ModuleType("django.core.exceptions")
+        exceptions.ValidationError = type("ValidationError", (Exception,), {})
+        with patch.dict(sys.modules, {"company.models": company_models, "django.core.exceptions": exceptions}):
+            choice = {"confirm": True, "existing_id": "7"}
+            self.assertIs(_resolve_sheet_manufacturer(choice, "YAGEO"), company)
+            company.is_manufacturer = False
+            with self.assertRaisesRegex(CatalogueError, "Confirm marking"):
+                _resolve_sheet_manufacturer(choice, "YAGEO")
+            self.assertIs(_resolve_sheet_manufacturer({**choice, "mark_jlc_manufacturer": True}, "YAGEO"), company)
 
     def test_hidden_manufacturer_role_checkbox_overrides_flex_styling(self):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"

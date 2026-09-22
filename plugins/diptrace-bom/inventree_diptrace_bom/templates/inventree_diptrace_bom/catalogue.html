@@ -40,6 +40,10 @@
     .copy-feedback { color: #12643b; font-size: 12px; }
     .external-link-field { display: grid; gap: 3px; margin-top: 7px; min-width: 180px; }
     .external-link-field label { color: #53657d; font-size: 12px; }
+    .sheet-mpn-field { display: grid; gap: 4px; margin-top: 8px; min-width: 205px; }
+    .sheet-mpn-field label { color: #53657d; font-size: 12px; }
+    .sheet-mpn-field button { justify-self: start; padding: 5px 9px; }
+    .unchecked-note { color: #8a5200; font-size: 12px; }
     .source-link { display: inline-block; margin-top: 4px; }
     .source-note { display: block; margin-top: 4px; color: #53657d; font-size: 11px; }
     #message { white-space: pre-wrap; }
@@ -53,7 +57,7 @@
 <body>
 <main>
   <h1>JLC Part Catalogue Import</h1>
-  <p class="muted">Upload a DipTrace CSV/XLSX file. Preview checks every JLCPCB C-code against the spreadsheet manufacturer number and existing InvenTree records. Mismatches need explicit review. Save items individually as you finish them, or apply approved rows together.</p>
+  <p class="muted">Upload a DipTrace CSV/XLSX file. The original Footprint stays unchanged; edit the spreadsheet MPN for any row that includes a CAD prefix, then Check again before saving. Mismatches need explicit review.</p>
   <section class="card">
     <div class="toolbar">
       <label for="file">BOM file</label>
@@ -64,9 +68,9 @@
   <section id="review" class="card" hidden>
     <h2>Review</h2>
     <p id="summary"></p>
-    <p class="muted">For each new Part, choose or create a category. When MPNs differ, search for the spreadsheet MPN's manufacturer or type a new name, then confirm interchangeability. The importer saves the JLCPCB link automatically. Enter an optional link for the spreadsheet manufacturer MPN; existing non-empty links are not overwritten. Unsaved entries stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
+    <p class="muted">For each new Part, choose or create a category. The editable spreadsheet MPN is checked separately from the original DipTrace Footprint. When MPNs differ, choose their manufacturer—even if it is the same as the JLC manufacturer—and confirm interchangeability. The JLCPCB link is saved automatically; an optional spreadsheet MPN link can be added. Unsaved edits stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th><th>Action</th></tr></thead>
+      <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th><th>Action</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <p><button id="apply" type="button">Apply approved rows</button></p>
@@ -182,9 +186,7 @@
       input.setAttribute('list', list.id);
       const normalize = value => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
       const jlcName = normalize(item.product.manufacturer);
-      for (const company of current.manufacturers) {
-        if (normalize(company.name) !== jlcName) list.appendChild(option(company.name, company.name));
-      }
+      for (const company of current.manufacturers) list.appendChild(option(company.name, company.name));
       const hint = document.createElement('small'); hint.id = `manufacturer-hint-${rowNumber}`;
       input.setAttribute('aria-describedby', hint.id);
       const markSheetLabel = document.createElement('label'); markSheetLabel.className = 'confirmation';
@@ -198,8 +200,8 @@
         const needsMark = Boolean(existing && !existing.is_manufacturer && name !== jlcName);
         markSheetLabel.hidden = !needsMark;
         markSheet.checked = false;
-        hint.textContent = !name ? `For sheet MPN ${item.row.footprint}; JLC maker is separate.`
-          : name === jlcName ? 'Choose the spreadsheet MPN maker, not the JLC maker.'
+        hint.textContent = !name ? `Choose the maker of sheet MPN ${item.row.sheet_mpn}.`
+          : name === jlcName ? 'Same maker as JLC; confirm these two distinct MPNs are interchangeable.'
           : needsMark ? `Existing company “${existing.name}” needs the Manufacturer flag.`
           : existing ? `Existing manufacturer “${existing.name}” will be reused.`
           : `New manufacturer “${input.value.trim()}” will be created on save.`;
@@ -224,6 +226,7 @@
     const category = tr.querySelector('.category');
     const manufacturer = tr.querySelector('.manufacturer-choice');
     return {
+      sheet_mpn: tr.querySelector('.sheet-mpn')?.value.trim() ?? '',
       category: category ? {
         existing_id: category.querySelector('.existing').value,
         new_name: category.querySelector('.new-name').value.trim(),
@@ -248,15 +251,18 @@
     catch { show('Browser draft storage is unavailable; save each item before leaving this page.', 'error'); }
   }
   function persistDraft() {
-    if (!draftKey || !current) return;
+    if (!current) return {};
     const draft = {};
     for (const tr of rows.querySelectorAll('tr[data-row]')) {
-      if (tr.dataset.saved !== 'true') draft[tr.dataset.row] = choicesFor(tr);
+      draft[tr.dataset.row] = choicesFor(tr);
     }
     storeDraft(draft);
+    return draft;
   }
   function restoreChoices(tr, choice) {
     if (!choice || typeof choice !== 'object') return;
+    const sheetMpn = tr.querySelector('.sheet-mpn');
+    if (sheetMpn && typeof choice.sheet_mpn === 'string') sheetMpn.value = choice.sheet_mpn;
     const category = tr.querySelector('.category');
     if (category && choice.category) {
       const saved = choice.category;
@@ -298,6 +304,17 @@
       cell(tr, item.row.designators);
       cell(tr, item.row.jlcpcb_part);
       const sheetCell = copyCell(tr, item.row.footprint, 'Sheet Footprint / MPN');
+      const mpnWrap = document.createElement('div'); mpnWrap.className = 'sheet-mpn-field';
+      const mpnLabel = document.createElement('label'); mpnLabel.textContent = 'Spreadsheet MPN (editable)';
+      const mpnInput = document.createElement('input'); mpnInput.type = 'text'; mpnInput.className = 'sheet-mpn';
+      mpnInput.id = `sheet-mpn-${item.row.row}`; mpnInput.maxLength = 100;
+      mpnInput.value = item.row.sheet_mpn ?? item.row.footprint; mpnLabel.htmlFor = mpnInput.id;
+      const check = document.createElement('button'); check.type = 'button'; check.className = 'check-mpn';
+      check.textContent = 'Check again'; check.setAttribute('aria-label', `Check edited MPN for row ${item.row.row}`);
+      const unchecked = document.createElement('small'); unchecked.className = 'unchecked-note';
+      unchecked.textContent = 'Changed: check again before saving.'; unchecked.hidden = true;
+      mpnWrap.append(mpnLabel, mpnInput, check, unchecked); sheetCell.appendChild(mpnWrap);
+      tr.dataset.reviewedMpn = item.row.sheet_mpn ?? item.row.footprint;
       if (item.status === 'review' && item.needs_sheet_manufacturer) {
         externalLinkField(sheetCell, item.row.row, 'sheet', 'Spreadsheet MPN link (optional)');
       }
@@ -330,7 +347,20 @@
       tr.appendChild(action); rows.appendChild(tr);
       restoreChoices(tr, draft[String(item.row.row)]);
     }
+    updatePendingRows();
     persistDraft();
+  }
+  function updatePendingRows() {
+    let pending = false;
+    for (const tr of rows.querySelectorAll('tr[data-row]')) {
+      const changed = tr.querySelector('.sheet-mpn').value.trim() !== tr.dataset.reviewedMpn;
+      pending ||= changed;
+      tr.querySelector('.unchecked-note').hidden = !changed;
+      const save = tr.querySelector('.save-item');
+      if (save) save.disabled = busy || changed;
+    }
+    applyButton.disabled = busy || pending;
+    return pending;
   }
   function collectPayload(rowNumber = null) {
     const categories = {}, manufacturers = {}, sheet_links = {};
@@ -351,13 +381,20 @@
     }
     return `diptrace-catalogue-draft-v1:${selected.name}:${selected.size}:${selected.lastModified}`;
   }
-  async function previewFile() {
+  async function previewFile(draft = loadDraft()) {
     const form = new FormData(); form.append('file', file.files[0]);
+    const overrides = {};
+    for (const [row, choice] of Object.entries(draft)) {
+      if (typeof choice?.sheet_mpn === 'string') overrides[row] = choice.sheet_mpn;
+    }
+    form.append('mpn_overrides', JSON.stringify(overrides));
     return responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
   }
   function setBusy(value) {
     busy = value; previewButton.disabled = value; applyButton.disabled = value;
     for (const button of rows.querySelectorAll('.save-item')) button.disabled = value;
+    for (const button of rows.querySelectorAll('.check-mpn')) button.disabled = value;
+    if (!value) updatePendingRows();
   }
   function resultText(data) {
     return [
@@ -380,12 +417,27 @@
     } catch (error) { show(error.message, 'error'); }
     finally { setBusy(false); }
   });
-  rows.addEventListener('input', persistDraft);
+  rows.addEventListener('input', event => {
+    if (event.target.matches('.sheet-mpn')) {
+      const tr = event.target.closest('tr[data-row]');
+      if (event.target.value.trim() !== tr.dataset.reviewedMpn) {
+        // Approval and a source link belong to the previously checked MPN.
+        const maker = tr.querySelector('.manufacturer-input');
+        if (maker) { maker.value = ''; maker.dispatchEvent(new Event('input')); }
+        const confirmation = tr.querySelector('.confirm-equivalent');
+        if (confirmation) confirmation.checked = false;
+        const link = tr.querySelector('.sheet-link');
+        if (link) link.value = '';
+      }
+    }
+    persistDraft(); updatePendingRows();
+  });
   rows.addEventListener('change', persistDraft);
   async function applyRows(rowNumber = null) {
     if (busy || !current) return;
+    if (updatePendingRows()) return show('A spreadsheet MPN changed. Click Check again before saving.', 'error');
     if (rowNumber === null && !window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
-    persistDraft();
+    const draft = persistDraft();
     const payload = collectPayload(rowNumber);
     setBusy(true); show('Rechecking source pages and saving catalogue records…');
     try {
@@ -394,13 +446,10 @@
         body: JSON.stringify(payload),
       }));
       const saved = new Set(data.saved_rows.map(String));
-      const draft = loadDraft();
-      for (const row of saved) delete draft[row];
-      storeDraft(draft);
       if (saved.size) {
         try {
-          const refreshed = await previewFile();
-          render(refreshed, loadDraft());
+          const refreshed = await previewFile(draft);
+          render(refreshed, draft);
           show(`${resultText(data)}\nReview refreshed with the latest categories and manufacturers.`, 'success');
         } catch (error) {
           for (const row of saved) {
@@ -417,6 +466,17 @@
     finally { setBusy(false); }
   }
   rows.addEventListener('click', event => {
+    const check = event.target.closest('.check-mpn');
+    if (check) {
+      if (busy) return;
+      const draft = persistDraft();
+      setBusy(true); show('Checking edited spreadsheet MPNs against JLCPCB and InvenTree…');
+      previewFile(draft).then(data => {
+        render(data, draft);
+        show('MPNs rechecked. Review the updated decisions before saving.', 'success');
+      }).catch(error => show(error.message, 'error')).finally(() => setBusy(false));
+      return;
+    }
     const button = event.target.closest('.save-item');
     if (button) applyRows(button.closest('tr').dataset.row);
   });
