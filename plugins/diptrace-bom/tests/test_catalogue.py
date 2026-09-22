@@ -1,5 +1,6 @@
 import io
 import unittest
+from pathlib import Path
 
 from inventree_diptrace_bom.catalogue import (
     CatalogueError,
@@ -101,6 +102,10 @@ class CatalogueTests(unittest.TestCase):
     def test_alternate_mpn_rejects_invalid_manufacturer_id(self):
         with self.assertRaisesRegex(CatalogueError, "ID is invalid"):
             _validate_manufacturer_choice({"confirm": True, "existing_id": "not-an-id"})
+
+    def test_hidden_manufacturer_role_checkbox_overrides_flex_styling(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        self.assertIn(".confirmation[hidden] { display: none; }", page.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
