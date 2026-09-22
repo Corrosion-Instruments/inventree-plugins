@@ -4,7 +4,9 @@ from pathlib import Path
 
 from inventree_diptrace_bom.catalogue import (
     CatalogueError,
+    CatalogueImportService,
     JlcPageClient,
+    JlcPart,
     _company_metadata,
     _conflicting_codes,
     _is_jlcpcb_name,
@@ -54,6 +56,36 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("100MΩ", part.description)
         self.assertIsNone(compare_row({"footprint": "crha2512af100mfkef"}, part))
         self.assertIn("differs", compare_row({"footprint": "wrong part"}, part))
+
+    def test_api_manufacturer_is_authoritative_and_complete_api_skips_page(self):
+        class PageClient:
+            def fetch(self, code):
+                raise AssertionError("A complete API record must not fetch HTML")
+
+        record = {"componentCode": "C49420596", "componentModel": "FBB04009-M24S1143BKM",
+                  "componentBrandEn": "TXGA(特思嘉)", "componentSpecification": "SMD-24P",
+                  "description": "Connector"}
+        part = CatalogueImportService(client=PageClient())._fetch_product("C49420596", record)
+        self.assertEqual(part.manufacturer, "TXGA(特思嘉)")
+        self.assertEqual(part.source, "api")
+
+    def test_page_fills_missing_api_description_without_replacing_api_maker(self):
+        class PageClient:
+            def fetch(self, code):
+                return JlcPart(code, "TXGA", "FBB04009-M24S1143BKM", "SMD-24P SMT ROHS",
+                               "SMD-24P", f"https://jlcpcb.com/partdetail/{code}")
+
+        record = {"componentCode": "C49420596", "componentModel": "FBB04009-M24S1143BKM",
+                  "componentBrandEn": "TXGA(特思嘉)", "componentSpecification": "SMD-24P"}
+        service = CatalogueImportService(client=PageClient())
+        part = service._fetch_product("C49420596", record)
+        self.assertEqual(part.manufacturer, "TXGA(特思嘉)")
+        self.assertEqual(part.description, "SMD-24P SMT ROHS")
+        self.assertEqual(part.source, "api+page")
+        with self.assertRaisesRegex(CatalogueError, "disagree on the MPN"):
+            service._fetch_product("C49420596", {**record, "componentModel": "OTHER"})
+        with self.assertRaisesRegex(CatalogueError, "API identity"):
+            service._fetch_product("C49420596", {**record, "componentCode": "C1546"})
 
     def test_wrong_page_identity_is_blocked(self):
         with self.assertRaisesRegex(CatalogueError, "identity"):

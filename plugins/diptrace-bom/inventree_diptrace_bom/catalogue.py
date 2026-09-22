@@ -32,6 +32,7 @@ class JlcPart:
     url: str
     manufacturer_description: str = ""
     manufacturer_website: str = ""
+    source: str = "page"
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -138,13 +139,41 @@ class CatalogueImportService:
         return None
 
     def _api_metadata(self, codes: list[str]) -> dict[str, dict]:
-        """Optional company metadata; a missing/failed API never fabricates it."""
+        """Fetch component facts in one API request; page lookup remains a fallback."""
         if not self.api_client:
             return {}
         try:
             return self.api_client.component_details(codes)
         except Exception:
             return {}
+
+    def _fetch_product(self, code: str, record: dict | None) -> JlcPart:
+        """Prefer JLC API facts, using the page only for missing fields."""
+        if not isinstance(record, dict) or not record:
+            return self.client.fetch(code)
+        api_code = str(record.get("componentCode") or record.get("component_code") or "").upper()
+        if api_code != code:
+            raise CatalogueError(f"JLCPCB API identity does not match {code}")
+        manufacturer = str(record.get("componentBrandEn") or "").strip()
+        mpn = str(record.get("componentModel") or "").strip()
+        package = str(record.get("componentSpecification") or "").strip()
+        description = str(record.get("description") or "").strip()
+        if not all((manufacturer, mpn, package, description)):
+            page = self.client.fetch(code)
+            if mpn and normalize_identifier(mpn) != normalize_identifier(page.mpn):
+                raise CatalogueError(f"JLCPCB API and page disagree on the MPN for {code}")
+            if package and normalize_identifier(package) != normalize_identifier(page.package):
+                raise CatalogueError(f"JLCPCB API and page disagree on the package for {code}")
+            manufacturer = manufacturer or page.manufacturer
+            mpn = mpn or page.mpn
+            package = package or page.package
+            description = description or page.description
+            source = "api+page"
+        else:
+            source = "api"
+        return JlcPart(code=code, manufacturer=manufacturer, mpn=mpn,
+                       description=description, package=package,
+                       url=f"https://jlcpcb.com/partdetail/{code}", source=source)
 
     def preview(self, rows: list[dict]) -> dict:
         from company.models import Company
@@ -168,7 +197,7 @@ class CatalogueImportService:
             else:
                 if code not in fetched:
                     try:
-                        fetched[code] = self.client.fetch(code)
+                        fetched[code] = self._fetch_product(code, api_metadata.get(code))
                     except CatalogueError as exc:
                         fetched[code] = exc
                 product = fetched[code]

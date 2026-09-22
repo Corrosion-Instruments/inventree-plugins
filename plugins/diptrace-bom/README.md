@@ -17,15 +17,27 @@ Upload the same CSV/XLSX format to preview manufacturer and supplier records.
 The `Footprint` column is treated as the expected manufacturer part number for
 this workflow, not as a PCB land-pattern value.
 
-The catalogue importer reads the public JLCPCB part-detail pages. Exact matches
-between each page's `MFR.Part #` and the CSV `Footprint` value (ignoring only
+When JLCPCB Open API credentials are configured, the catalogue importer uses
+one batch API lookup for component identity, manufacturer name, package and
+description. The API manufacturer name is kept exactly as returned, including
+any bilingual suffix; it is not shortened to the page's display name. If an
+API record lacks a required field, the importer fetches that part's public
+JLCPCB page to fill the gap while retaining the API manufacturer name. An API
+MPN or package that disagrees with a fetched page blocks that row. Without
+configured API access, the public page remains the fallback source. The
+preview identifies which source supplied each row. Existing catalogue links
+that conflict with a newly returned API manufacturer are never silently
+repointed.
+
+Exact matches
+between JLCPCB's manufacturer number and the CSV `Footprint` value (ignoring only
 case and incidental whitespace) are ready automatically. Mismatches require
 the operator to search for an existing manufacturer or type a new manufacturer
 name for the spreadsheet MPN in one field, then explicitly confirm that it is
 fully interchangeable with the JLCPCB MPN.
 The importer then adds both Manufacturer Part records to one internal Part;
 the JLCPCB C-code Supplier Part links to the JLCPCB Manufacturer Part. It does
-not infer the spreadsheet manufacturer's name from JLCPCB. Missing pages,
+not infer the spreadsheet manufacturer's name from JLCPCB. Missing source data,
 duplicate identifiers, and conflicting existing InvenTree links remain blocked.
 The JLCPCB Manufacturer Part gets the known JLCPCB page URL automatically. For
 a mismatched spreadsheet MPN, the preview offers one optional URL field; its

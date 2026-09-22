@@ -41,6 +41,7 @@
     .external-link-field { display: grid; gap: 3px; margin-top: 7px; min-width: 180px; }
     .external-link-field label { color: #53657d; font-size: 12px; }
     .source-link { display: inline-block; margin-top: 4px; }
+    .source-note { display: block; margin-top: 4px; color: #53657d; font-size: 11px; }
     #message { white-space: pre-wrap; }
     .error { color: #a72b2b; }
     .success { color: #12643b; }
@@ -306,7 +307,13 @@
         source.href = item.product.url; source.target = '_blank'; source.rel = 'noopener noreferrer';
         source.textContent = 'Open JLCPCB page ↗'; jlcCell.appendChild(source);
       }
-      cell(tr, item.product?.manufacturer);
+      const makerCell = cell(tr, item.product?.manufacturer);
+      if (item.product?.source) {
+        const note = document.createElement('small'); note.className = 'source-note';
+        note.textContent = item.product.source === 'api' ? 'JLC API' :
+          item.product.source === 'api+page' ? 'JLC API; missing fields from page' : 'JLC page fallback';
+        makerCell.appendChild(note);
+      }
       cell(tr, item.product?.package);
       const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
       status.title = item.product?.description || '';
