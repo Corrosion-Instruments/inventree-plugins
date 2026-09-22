@@ -17,7 +17,7 @@
     button { background: #2463dc; color: white; border: 0; padding: 9px 16px; border-radius: 5px; cursor: pointer; }
     button:disabled { opacity: .5; cursor: wait; }
     input[type=file] { padding: 8px; }
-    input[type=text], select { width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #b8c6d9; border-radius: 4px; }
+    input[type=text], input[type=url], select { width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #b8c6d9; border-radius: 4px; }
     label { font-weight: 600; }
     .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .table-wrap { overflow-x: auto; }
@@ -38,6 +38,9 @@
     .copy-button { flex: 0 0 auto; padding: 2px; color: #2463dc; background: transparent; border: 1px solid transparent; }
     .copy-button:hover, .copy-button:focus-visible { background: #edf2fa; border-color: #b8c6d9; }
     .copy-feedback { color: #12643b; font-size: 12px; }
+    .external-link-field { display: grid; gap: 3px; margin-top: 7px; min-width: 180px; }
+    .external-link-field label { color: #53657d; font-size: 12px; }
+    .source-link { display: inline-block; margin-top: 4px; }
     #message { white-space: pre-wrap; }
     .error { color: #a72b2b; }
     .success { color: #12643b; }
@@ -57,7 +60,7 @@
   <section id="review" class="card" hidden>
     <h2>Review</h2>
     <p id="summary"></p>
-    <p class="muted">For each new Part, choose or create a category. When MPNs differ, search for the spreadsheet MPN's manufacturer or type a new name, then confirm interchangeability. If an existing company is not marked as a manufacturer, explicitly approve that role change. The JLCPCB supplier SKU links to the JLCPCB manufacturer MPN.</p>
+    <p class="muted">For each new Part, choose or create a category. When MPNs differ, search for the spreadsheet MPN's manufacturer or type a new name, then confirm interchangeability. The importer saves the JLCPCB link automatically. Enter an optional link for the spreadsheet manufacturer MPN; existing non-empty links are not overwritten.</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th></tr></thead>
       <tbody id="rows"></tbody>
@@ -128,6 +131,15 @@
       clearTimeout(timer); timer = setTimeout(() => { feedback.hidden = true; }, 2500);
     });
     line.append(number, button); td.append(line, feedback); tr.appendChild(td); return td;
+  }
+  function externalLinkField(td, rowNumber, kind, label) {
+    const wrap = document.createElement('div'); wrap.className = 'external-link-field';
+    const fieldLabel = document.createElement('label'); fieldLabel.textContent = label;
+    const input = document.createElement('input'); input.type = 'url'; input.className = `${kind}-link`;
+    input.id = `${kind}-link-${rowNumber}`; input.dataset.row = rowNumber;
+    input.placeholder = 'https://…'; input.maxLength = 2000;
+    fieldLabel.htmlFor = input.id;
+    wrap.append(fieldLabel, input); td.appendChild(wrap);
   }
   function categoryControls(tr, rowNumber) {
     const td = document.createElement('td');
@@ -209,8 +221,16 @@
       const tr = document.createElement('tr');
       cell(tr, item.row.designators);
       cell(tr, item.row.jlcpcb_part);
-      copyCell(tr, item.row.footprint, 'Sheet Footprint / MPN');
-      copyCell(tr, item.product?.mpn, 'JLC MFR Part #');
+      const sheetCell = copyCell(tr, item.row.footprint, 'Sheet Footprint / MPN');
+      if (item.status === 'review' && item.needs_sheet_manufacturer) {
+        externalLinkField(sheetCell, item.row.row, 'sheet', 'Spreadsheet MPN link (optional)');
+      }
+      const jlcCell = copyCell(tr, item.product?.mpn, 'JLC MFR Part #');
+      if (item.product && item.status !== 'blocked') {
+        const source = document.createElement('a'); source.className = 'source-link';
+        source.href = item.product.url; source.target = '_blank'; source.rel = 'noopener noreferrer';
+        source.textContent = 'Open JLCPCB page ↗'; jlcCell.appendChild(source);
+      }
       cell(tr, item.product?.manufacturer);
       cell(tr, item.product?.package);
       const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
@@ -237,6 +257,7 @@
     if (!window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
     const categories = {};
     const manufacturers = {};
+    const sheet_links = {};
     for (const wrap of document.querySelectorAll('.category')) {
       categories[wrap.dataset.row] = {
         existing_id: wrap.querySelector('.existing').value,
@@ -252,15 +273,16 @@
         mark_jlc_manufacturer: wrap.querySelector('.mark-jlc-manufacturer')?.checked || false,
       };
     }
+    for (const input of document.querySelectorAll('.sheet-link')) sheet_links[input.dataset.row] = input.value.trim();
     applyButton.disabled = true; show('Rechecking source pages and saving catalogue records…');
     try {
       const data = await responseJson(await fetch('apply/', {
         method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
-        body: JSON.stringify({preview_token: current.preview_token, categories, manufacturers}),
+        body: JSON.stringify({preview_token: current.preview_token, categories, manufacturers, sheet_links}),
       }));
       const lines = [
         `${data.created_parts} Parts, ${data.created_categories} categories, ${data.created_manufacturers} manufacturers and ${data.created_supplier} JLCPCB supplier created; ${data.promoted_manufacturers} existing companies marked as manufacturers.`,
-        `${data.created_mpn} Manufacturer Parts, ${data.created_sku} Supplier Parts and ${data.created_package} Package parameters created.`,
+        `${data.created_mpn} Manufacturer Parts, ${data.created_sku} Supplier Parts and ${data.created_package} Package parameters created; ${data.updated_links} blank links filled.`,
         `${data.existing} rows already complete; ${data.skipped.length} skipped.`,
         ...data.skipped.map(item => `${item.code}: ${item.reason}`),
       ];

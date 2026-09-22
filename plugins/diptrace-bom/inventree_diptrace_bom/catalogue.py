@@ -215,7 +215,8 @@ class CatalogueImportService:
             },
         }
 
-    def _plan_product(self, product: JlcPart, sheet_mpn: str = "", sheet_manufacturer=None) -> dict:
+    def _plan_product(self, product: JlcPart, sheet_mpn: str = "", sheet_manufacturer=None,
+                      sheet_link: str = "") -> dict:
         from company.models import Company, ManufacturerPart, SupplierPart
         from django.db.models import Q
         from part.models import Part
@@ -240,6 +241,8 @@ class CatalogueImportService:
         maker_part = maker_parts[0] if maker_parts else None
         sheet_part = sheet_parts[0] if sheet_parts else None
         supplier_part = supplier_parts[0] if supplier_parts else None
+        if sheet_part and sheet_link and sheet_part.link and sheet_part.link != sheet_link:
+            return _blocked("Existing spreadsheet Manufacturer Part has a different link; edit that record manually")
         linked_ids = {record.part_id for record in (maker_part, sheet_part, supplier_part) if record}
         if len(linked_ids) > 1:
             return _blocked("Manufacturer and supplier records point to different InvenTree Parts")
@@ -270,7 +273,9 @@ class CatalogueImportService:
             if len(values) > 1 or (values and normalize_identifier(values[0].data) != normalize_identifier(product.package)):
                 return _blocked("Existing Part has a different Package parameter")
             has_package = bool(values)
-        if part and part.locked and (not maker_part or not supplier_part or not has_package or not part.description or (sheet_manufacturer and not sheet_part)):
+        if part and part.locked and (not maker_part or not supplier_part or not has_package or not part.description
+                                    or (sheet_manufacturer and not sheet_part) or (maker_part and not maker_part.link)
+                                    or (sheet_link and sheet_part and not sheet_part.link)):
             return _blocked("Existing Part is locked and would need catalogue changes")
 
         company_metadata_missing = bool(manufacturer and (
@@ -279,6 +284,8 @@ class CatalogueImportService:
         ))
         complete = bool(part and manufacturer and manufacturer.is_manufacturer and supplier and maker_part and supplier_part and has_package
                         and (not sheet_manufacturer or sheet_part)
+                        and maker_part.link
+                        and (not sheet_link or (sheet_part and sheet_part.link == sheet_link))
                         and supplier_part.manufacturer_part_id == maker_part.pk
                         and part.description and not company_metadata_missing)
         return {
@@ -290,6 +297,7 @@ class CatalogueImportService:
         }
 
     def apply(self, rows: list[dict], category_ids: dict, manufacturer_choices: dict,
+              sheet_links: dict,
               reviewed_mpns: dict, reviewed_manufacturers: dict, user) -> dict:
         """Re-fetch source facts and re-plan inside one transaction before writing."""
         from common.models import Parameter, ParameterTemplate
@@ -308,7 +316,7 @@ class CatalogueImportService:
             content_type = ContentType.objects.get_for_model(Part)
             output = {"created_parts": 0, "created_categories": 0, "created_manufacturers": 0,
                       "promoted_manufacturers": 0, "created_supplier": 0,
-                      "created_mpn": 0, "created_sku": 0, "created_package": 0,
+                      "created_mpn": 0, "created_sku": 0, "created_package": 0, "updated_links": 0,
                       "existing": 0, "skipped": []}
             for item in preview["rows"]:
                 row = item["row"]
@@ -333,14 +341,16 @@ class CatalogueImportService:
                     continue
                 sheet_mpn = ""
                 sheet_manufacturer = None
+                sheet_link = ""
                 if item["needs_sheet_manufacturer"]:
                     try:
                         sheet_manufacturer = _resolve_sheet_manufacturer(choice, product.manufacturer)
+                        sheet_link = validate_external_link(sheet_links.get(row_key))
                     except CatalogueError as exc:
                         output["skipped"].append({"code": code, "reason": str(exc)})
                         continue
                     sheet_mpn = str(row["footprint"]).strip()
-                fresh = self._plan_product(product, sheet_mpn, sheet_manufacturer)
+                fresh = self._plan_product(product, sheet_mpn, sheet_manufacturer, sheet_link)
                 if fresh["status"] == "blocked":
                     output["skipped"].append({"code": code, "reason": fresh["reason"]})
                     continue
@@ -436,10 +446,18 @@ class CatalogueImportService:
                     maker_part = ManufacturerPart.objects.create(part=part, manufacturer=manufacturer, MPN=product.mpn,
                                                                  description=product.description[:250], link=product.url)
                     output["created_mpn"] += 1
+                elif not maker_part.link:
+                    maker_part.link = product.url
+                    maker_part.save(update_fields=["link"])
+                    output["updated_links"] += 1
                 if sheet_manufacturer and sheet_part is None:
                     ManufacturerPart.objects.create(part=part, manufacturer=sheet_manufacturer, MPN=sheet_mpn,
-                                                    description=product.description[:250])
+                                                    description=product.description[:250], link=sheet_link)
                     output["created_mpn"] += 1
+                elif sheet_part and sheet_link and not sheet_part.link:
+                    sheet_part.link = sheet_link
+                    sheet_part.save(update_fields=["link"])
+                    output["updated_links"] += 1
                 if supplier_part is None:
                     SupplierPart.objects.create(part=part, supplier=supplier, SKU=product.code,
                                                 manufacturer_part=maker_part, description=product.description[:250], link=product.url)
@@ -461,6 +479,19 @@ class CatalogueImportService:
 
 def _blocked(reason: str) -> dict:
     return {"status": "blocked", "reason": reason, "part": None, "needs_category": False}
+
+
+def validate_external_link(value: str | None) -> str:
+    """Validate a saved part URL without fetching it."""
+    link = str(value or "").strip()
+    if not link:
+        return ""
+    parsed = urlparse(link)
+    if (len(link) > 2000 or any(character.isspace() for character in link)
+            or parsed.scheme not in {"http", "https"} or not parsed.hostname
+            or parsed.username or parsed.password):
+        raise CatalogueError("Part link must be an http(s) URL without credentials or spaces")
+    return link
 
 
 def _resolve_sheet_manufacturer(choice: dict, jlc_name: str):

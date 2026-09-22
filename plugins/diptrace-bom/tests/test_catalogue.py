@@ -11,6 +11,7 @@ from inventree_diptrace_bom.catalogue import (
     _validate_manufacturer_choice,
     compare_row,
     parse_jlc_page,
+    validate_external_link,
 )
 from inventree_diptrace_bom.parser import parse_bom
 
@@ -106,6 +107,13 @@ class CatalogueTests(unittest.TestCase):
     def test_hidden_manufacturer_role_checkbox_overrides_flex_styling(self):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
         self.assertIn(".confirmation[hidden] { display: none; }", page.read_text(encoding="utf-8"))
+
+    def test_optional_sheet_part_link_accepts_only_web_urls(self):
+        self.assertEqual(validate_external_link(None), "")
+        self.assertEqual(validate_external_link(" https://example.com/part/123 "), "https://example.com/part/123")
+        for value in ("javascript:alert(1)", "https://user:secret@example.com/part", "https://example.com/bad path"):
+            with self.subTest(value=value), self.assertRaises(CatalogueError):
+                validate_external_link(value)
 
 
 if __name__ == "__main__":
