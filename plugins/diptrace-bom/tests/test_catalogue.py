@@ -6,6 +6,7 @@ from inventree_diptrace_bom.catalogue import (
     JlcPageClient,
     _company_metadata,
     _conflicting_codes,
+    _is_jlcpcb_name,
     compare_row,
     parse_jlc_page,
 )
@@ -80,6 +81,11 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(_company_metadata(record, "Other Co")["manufacturer_description"], "")
         record["manufacturerWebsite"] = "javascript:alert(1)"
         self.assertEqual(_company_metadata(record, "Vishay Intertech")["manufacturer_website"], "")
+
+    def test_jlc_supplier_alias_is_narrow(self):
+        self.assertTrue(_is_jlcpcb_name("JLC PCB"))
+        self.assertTrue(_is_jlcpcb_name("JLCPCB"))
+        self.assertFalse(_is_jlcpcb_name("JLCPCB Europe"))
 
 
 if __name__ == "__main__":

@@ -129,8 +129,11 @@ class CatalogueImportService:
             if not matches[0].is_supplier:
                 raise CatalogueError("JLCPCB company exists but is not marked as a supplier")
             return matches[0]
-        aliases = Company.objects.filter(is_supplier=True, name__icontains="JLC")
-        if aliases.exists():
+        aliases = list(Company.objects.filter(is_supplier=True, name__icontains="JLC"))
+        jlcpcb_aliases = [company for company in aliases if _is_jlcpcb_name(company.name)]
+        if len(jlcpcb_aliases) == 1:
+            return jlcpcb_aliases[0]
+        if aliases:
             raise CatalogueError("A JLC-named supplier already exists; select it in the plugin's JLC / LCSC Supplier setting")
         return None
 
@@ -392,6 +395,11 @@ class CatalogueImportService:
 
 def _blocked(reason: str) -> dict:
     return {"status": "blocked", "reason": reason, "part": None, "needs_category": False}
+
+
+def _is_jlcpcb_name(name: str) -> bool:
+    """Recognize only spelling variants of JLCPCB, not another JLC company."""
+    return re.sub(r"[^a-z0-9]", "", str(name or "").casefold()) == "jlcpcb"
 
 
 def _conflicting_codes(rows: list[dict]) -> set[str]:
