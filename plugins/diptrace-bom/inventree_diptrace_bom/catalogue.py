@@ -97,7 +97,7 @@ class JlcPageClient:
 
 
 def compare_row(row: dict, product: JlcPart) -> str | None:
-    """Return a blocking mismatch message, or None for an exact MPN match."""
+    """Describe a sheet / JLC MPN difference, or return None for a match."""
     sheet_mpn = str(row.get("footprint") or "").strip()
     if not sheet_mpn:
         return "The spreadsheet Footprint / manufacturer part number is blank"
@@ -147,6 +147,7 @@ class CatalogueImportService:
             return {}
 
     def preview(self, rows: list[dict]) -> dict:
+        from company.models import Company
         from part.models import PartCategory
 
         if not rows or len(rows) > MAX_ROWS:
@@ -176,10 +177,14 @@ class CatalogueImportService:
                     product = replace(product, **metadata)
                     result["product"] = product.as_dict()
                     mismatch = compare_row(row, product)
-                    if mismatch:
+                    if not str(row.get("footprint") or "").strip():
                         result["reason"] = mismatch
                     else:
                         result.update(self._plan_product(product))
+                        if mismatch and (result["status"] != "blocked" or result["reason"] == "Existing Part has a different Manufacturer Part; resolve its identity manually"):
+                            if result["status"] == "blocked":
+                                result["needs_category"] = True
+                            result.update(status="review", reason=f"{mismatch}. Confirm interchangeability and select the spreadsheet MPN's manufacturer.")
             results.append(result)
 
         categories = [
@@ -189,15 +194,20 @@ class CatalogueImportService:
         return {
             "rows": results,
             "categories": categories,
+            "manufacturers": [
+                {"pk": company.pk, "name": company.name}
+                for company in Company.objects.filter(is_manufacturer=True).order_by("name")
+            ],
             "summary": {
                 "total": len(results),
                 "ready": sum(item["status"] == "ready" for item in results),
+                "review": sum(item["status"] == "review" for item in results),
                 "complete": sum(item["status"] == "complete" for item in results),
                 "blocked": sum(item["status"] == "blocked" for item in results),
             },
         }
 
-    def _plan_product(self, product: JlcPart) -> dict:
+    def _plan_product(self, product: JlcPart, sheet_mpn: str = "", sheet_manufacturer=None) -> dict:
         from company.models import Company, ManufacturerPart, SupplierPart
         from django.db.models import Q
         from part.models import Part
@@ -216,22 +226,27 @@ class CatalogueImportService:
             return _blocked("Existing manufacturer company is not marked as a manufacturer")
 
         maker_parts = list(ManufacturerPart.objects.filter(manufacturer=manufacturer, MPN__iexact=product.mpn)[:2]) if manufacturer else []
+        sheet_parts = list(ManufacturerPart.objects.filter(manufacturer=sheet_manufacturer, MPN__iexact=sheet_mpn)[:2]) if getattr(sheet_manufacturer, "pk", None) else []
         supplier_parts = list(SupplierPart.objects.filter(supplier=supplier, SKU__iexact=product.code)[:2]) if supplier else []
-        if len(maker_parts) > 1 or len(supplier_parts) > 1:
+        if len(maker_parts) > 1 or len(sheet_parts) > 1 or len(supplier_parts) > 1:
             return _blocked("Duplicate manufacturer MPN or JLCPCB supplier SKU")
         maker_part = maker_parts[0] if maker_parts else None
+        sheet_part = sheet_parts[0] if sheet_parts else None
         supplier_part = supplier_parts[0] if supplier_parts else None
-        if maker_part and supplier_part and maker_part.part_id != supplier_part.part_id:
+        linked_ids = {record.part_id for record in (maker_part, sheet_part, supplier_part) if record}
+        if len(linked_ids) > 1:
             return _blocked("Manufacturer and supplier records point to different InvenTree Parts")
         if supplier_part and supplier_part.manufacturer_part_id not in (None, getattr(maker_part, "pk", None)):
             return _blocked("JLCPCB supplier record points to a different Manufacturer Part")
-        part = maker_part.part if maker_part else supplier_part.part if supplier_part else None
+        part = maker_part.part if maker_part else supplier_part.part if supplier_part else sheet_part.part if sheet_part else None
+        linked_part = part is not None
         if part is None:
-            candidates = list(Part.objects.filter(Q(IPN__iexact=product.mpn) | Q(name__iexact=product.mpn)).distinct()[:2])
+            lookup_mpn = sheet_mpn or product.mpn
+            candidates = list(Part.objects.filter(Q(IPN__iexact=lookup_mpn) | Q(name__iexact=lookup_mpn)).distinct()[:2])
             if len(candidates) > 1:
                 return _blocked("Multiple existing InvenTree Parts match this manufacturer number")
             part = candidates[0] if candidates else None
-        if part and ManufacturerPart.objects.filter(part=part).exclude(
+        if part and not linked_part and ManufacturerPart.objects.filter(part=part).exclude(
             manufacturer=manufacturer, MPN__iexact=product.mpn
         ).exists():
             return _blocked("Existing Part has a different Manufacturer Part; resolve its identity manually")
@@ -248,7 +263,7 @@ class CatalogueImportService:
             if len(values) > 1 or (values and normalize_identifier(values[0].data) != normalize_identifier(product.package)):
                 return _blocked("Existing Part has a different Package parameter")
             has_package = bool(values)
-        if part and part.locked and (not maker_part or not supplier_part or not has_package or not part.description):
+        if part and part.locked and (not maker_part or not supplier_part or not has_package or not part.description or (sheet_manufacturer and not sheet_part)):
             return _blocked("Existing Part is locked and would need catalogue changes")
 
         company_metadata_missing = bool(manufacturer and (
@@ -256,6 +271,7 @@ class CatalogueImportService:
             or (product.manufacturer_website and not manufacturer.website)
         ))
         complete = bool(part and manufacturer and supplier and maker_part and supplier_part and has_package
+                        and (not sheet_manufacturer or sheet_part)
                         and supplier_part.manufacturer_part_id == maker_part.pk
                         and part.description and not company_metadata_missing)
         return {
@@ -265,7 +281,8 @@ class CatalogueImportService:
             "needs_category": part is None,
         }
 
-    def apply(self, rows: list[dict], category_ids: dict, user) -> dict:
+    def apply(self, rows: list[dict], category_ids: dict, manufacturer_choices: dict,
+              reviewed_mpns: dict, user) -> dict:
         """Re-fetch source facts and re-plan inside one transaction before writing."""
         from common.models import Parameter, ParameterTemplate
         from company.models import Company, ManufacturerPart, SupplierPart
@@ -287,11 +304,25 @@ class CatalogueImportService:
             for item in preview["rows"]:
                 row = item["row"]
                 code = str(row.get("jlcpcb_part") or "").upper()
+                row_key = str(row["row"])
                 if item["status"] == "blocked":
                     output["skipped"].append({"code": code, "reason": item["reason"]})
                     continue
                 product = JlcPart(**item["product"])
-                fresh = self._plan_product(product)
+                if normalize_identifier(reviewed_mpns.get(row_key)) != normalize_identifier(product.mpn):
+                    output["skipped"].append({"code": code, "reason": "JLCPCB MPN changed since preview; preview the file again"})
+                    continue
+                sheet_mpn = ""
+                sheet_manufacturer = None
+                if item["status"] == "review":
+                    choice = manufacturer_choices.get(row_key) or {}
+                    try:
+                        sheet_manufacturer = _resolve_sheet_manufacturer(choice, product.manufacturer)
+                    except CatalogueError as exc:
+                        output["skipped"].append({"code": code, "reason": str(exc)})
+                        continue
+                    sheet_mpn = str(row["footprint"]).strip()
+                fresh = self._plan_product(product, sheet_mpn, sheet_manufacturer)
                 if fresh["status"] == "blocked":
                     output["skipped"].append({"code": code, "reason": fresh["reason"]})
                     continue
@@ -300,7 +331,7 @@ class CatalogueImportService:
                     continue
                 category = None
                 if fresh["needs_category"]:
-                    choice = category_ids.get(str(row["row"])) or {}
+                    choice = category_ids.get(row_key) or {}
                     if not isinstance(choice, dict):
                         choice = {"existing_id": choice}
                     existing_id = choice.get("existing_id")
@@ -357,13 +388,18 @@ class CatalogueImportService:
                     supplier = Company.objects.create(name="JLCPCB", is_supplier=True, active=True)
                     output["created_supplier"] += 1
 
+                if sheet_manufacturer and sheet_manufacturer.pk is None:
+                    sheet_manufacturer.save()
+                    output["created_manufacturers"] += 1
+
                 maker_part = ManufacturerPart.objects.filter(manufacturer=manufacturer, MPN__iexact=product.mpn).first()
                 supplier_part = SupplierPart.objects.filter(supplier=supplier, SKU__iexact=product.code).first()
-                part = maker_part.part if maker_part else supplier_part.part if supplier_part else None
+                sheet_part = ManufacturerPart.objects.filter(manufacturer=sheet_manufacturer, MPN__iexact=sheet_mpn).first() if sheet_manufacturer else None
+                part = maker_part.part if maker_part else supplier_part.part if supplier_part else sheet_part.part if sheet_part else None
                 if part is None and fresh["part"]:
                     part = Part.objects.get(pk=fresh["part"]["pk"])
                 if part is None:
-                    part = Part.objects.create(name=product.mpn[:100], description=product.description[:250], category=category,
+                    part = Part.objects.create(name=(sheet_mpn or product.mpn)[:100], description=product.description[:250], category=category,
                                                component=True, purchaseable=True, active=True, creation_user=user)
                     output["created_parts"] += 1
                 elif not part.description and not part.locked:
@@ -373,6 +409,10 @@ class CatalogueImportService:
                 if maker_part is None:
                     maker_part = ManufacturerPart.objects.create(part=part, manufacturer=manufacturer, MPN=product.mpn,
                                                                  description=product.description[:250], link=product.url)
+                    output["created_mpn"] += 1
+                if sheet_manufacturer and sheet_part is None:
+                    ManufacturerPart.objects.create(part=part, manufacturer=sheet_manufacturer, MPN=sheet_mpn,
+                                                    description=product.description[:250])
                     output["created_mpn"] += 1
                 if supplier_part is None:
                     SupplierPart.objects.create(part=part, supplier=supplier, SKU=product.code,
@@ -395,6 +435,56 @@ class CatalogueImportService:
 
 def _blocked(reason: str) -> dict:
     return {"status": "blocked", "reason": reason, "part": None, "needs_category": False}
+
+
+def _resolve_sheet_manufacturer(choice: dict, jlc_name: str):
+    """Validate explicit alternate-MPN approval without writing to the database."""
+    from company.models import Company
+    from django.core.exceptions import ValidationError
+
+    existing_id, new_name = _validate_manufacturer_choice(choice)
+    if existing_id:
+        manufacturer = Company.objects.filter(pk=existing_id, is_manufacturer=True).first()
+        if manufacturer is None:
+            raise CatalogueError("Selected spreadsheet manufacturer no longer exists")
+    else:
+        matches = list(Company.objects.filter(name__iexact=new_name)[:2])
+        if len(matches) > 1:
+            raise CatalogueError("Multiple companies already have this manufacturer name")
+        if matches:
+            manufacturer = matches[0]
+            if not manufacturer.is_manufacturer:
+                raise CatalogueError("Existing company with this name is not marked as a manufacturer")
+        else:
+            manufacturer = Company(name=new_name, is_manufacturer=True, active=True)
+            try:
+                manufacturer.full_clean()
+            except ValidationError as exc:
+                raise CatalogueError("Spreadsheet manufacturer name is invalid") from exc
+    if normalize_identifier(manufacturer.name) == normalize_identifier(jlc_name):
+        raise CatalogueError("Choose the different manufacturer for the spreadsheet MPN")
+    return manufacturer
+
+
+def _validate_manufacturer_choice(choice: dict) -> tuple[int | None, str]:
+    """Require one manufacturer selection and a positive interchangeability decision."""
+    if not isinstance(choice, dict) or choice.get("confirm") is not True:
+        raise CatalogueError("Confirm that the spreadsheet and JLCPCB MPNs are interchangeable")
+    raw_id = choice.get("existing_id")
+    existing_id = None
+    if raw_id:
+        try:
+            existing_id = int(raw_id)
+        except (TypeError, ValueError) as exc:
+            raise CatalogueError("Selected spreadsheet manufacturer ID is invalid") from exc
+        if existing_id <= 0:
+            raise CatalogueError("Selected spreadsheet manufacturer ID is invalid")
+    new_name = " ".join(str(choice.get("new_name") or "").split())
+    if bool(existing_id) == bool(new_name):
+        raise CatalogueError("Select one spreadsheet manufacturer or enter one new manufacturer name")
+    if len(new_name) > 100:
+        raise CatalogueError("Spreadsheet manufacturer name exceeds 100 characters")
+    return existing_id, new_name
 
 
 def _is_jlcpcb_name(name: str) -> bool:

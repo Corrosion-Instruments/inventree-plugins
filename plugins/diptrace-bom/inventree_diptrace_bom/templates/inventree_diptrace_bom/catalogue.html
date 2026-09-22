@@ -27,9 +27,11 @@
     .status { font-weight: 700; }
     .blocked { color: #a72b2b; }
     .ready { color: #12643b; }
+    .review { color: #8a5200; }
     .complete { color: #53657d; }
-    .category { min-width: 230px; display: grid; gap: 5px; }
-    .category small { color: #53657d; }
+    .category, .manufacturer-choice { min-width: 230px; display: grid; gap: 5px; }
+    .category small, .manufacturer-choice small { color: #53657d; }
+    .confirmation { display: flex; gap: 6px; align-items: flex-start; font-weight: normal; }
     #message { white-space: pre-wrap; }
     .error { color: #a72b2b; }
     .success { color: #12643b; }
@@ -38,7 +40,7 @@
 <body>
 <main>
   <h1>JLC Part Catalogue Import</h1>
-  <p class="muted">Upload a DipTrace CSV/XLSX file. Preview checks every JLCPCB C-code against the spreadsheet manufacturer number and existing InvenTree records. Mismatches are skipped. Nothing is saved until you apply the reviewed import.</p>
+  <p class="muted">Upload a DipTrace CSV/XLSX file. Preview checks every JLCPCB C-code against the spreadsheet manufacturer number and existing InvenTree records. Mismatches need explicit review. Nothing is saved until you apply the reviewed import.</p>
   <section class="card">
     <div class="toolbar">
       <label for="file">BOM file</label>
@@ -49,13 +51,13 @@
   <section id="review" class="card" hidden>
     <h2>Review</h2>
     <p id="summary"></p>
-    <p class="muted">For each new Part, choose an existing non-structural category, or type a new category name and optionally choose its parent. Existing Parts keep their current category.</p>
+    <p class="muted">For each new Part, choose or create a category. When the spreadsheet and JLCPCB MPNs differ, select or create the spreadsheet MPN's manufacturer and confirm interchangeability. Both manufacturer MPNs will belong to the same InvenTree Part; the JLCPCB supplier SKU will link to the JLCPCB manufacturer MPN.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>Manufacturer</th><th>Package</th><th>Decision</th><th>Category for new Part</th></tr></thead>
+      <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
-    <p><button id="apply" type="button">Apply unblocked rows</button></p>
-    <p class="muted">Applying rechecks the JLC pages and InvenTree records. Rows lacking a category or failing validation stay skipped. Applying the same file again does not create duplicate catalogue records.</p>
+    <p><button id="apply" type="button">Apply approved rows</button></p>
+    <p class="muted">Applying rechecks the JLC pages and InvenTree records. Unapproved mismatches, missing categories and conflicting records stay skipped. Applying the same file again does not create duplicate catalogue records.</p>
   </section>
   <section id="message" class="card" role="status" aria-live="polite" hidden></section>
 </main>
@@ -109,9 +111,34 @@
     wrap.append(existing, newName, parent);
     td.appendChild(wrap); tr.appendChild(td);
   }
+  function manufacturerControls(tr, item) {
+    if (item.status !== 'review') { cell(tr, '—'); return; }
+    const rowNumber = item.row.row;
+    const td = document.createElement('td');
+    const wrap = document.createElement('div'); wrap.className = 'manufacturer-choice'; wrap.dataset.row = rowNumber;
+    const existing = document.createElement('select'); existing.className = 'existing-manufacturer';
+    existing.setAttribute('aria-label', `Spreadsheet MPN manufacturer for row ${rowNumber}`);
+    existing.appendChild(option('', 'Choose existing manufacturer'));
+    for (const company of current.manufacturers) {
+      if (company.name.toLocaleLowerCase() !== item.product.manufacturer.toLocaleLowerCase()) {
+        existing.appendChild(option(company.pk, company.name));
+      }
+    }
+    const newName = document.createElement('input'); newName.type = 'text'; newName.maxLength = 100;
+    newName.className = 'new-manufacturer'; newName.placeholder = 'Or create manufacturer name';
+    newName.setAttribute('aria-label', `New spreadsheet manufacturer for row ${rowNumber}`);
+    existing.addEventListener('change', () => { if (existing.value) newName.value = ''; });
+    newName.addEventListener('input', () => { if (newName.value.trim()) existing.value = ''; });
+    const label = document.createElement('label'); label.className = 'confirmation';
+    const confirm = document.createElement('input'); confirm.type = 'checkbox'; confirm.className = 'confirm-equivalent';
+    confirm.setAttribute('aria-label', `Confirm interchangeability for row ${rowNumber}`);
+    label.append(confirm, document.createTextNode('I confirm these two MPNs are fully interchangeable.'));
+    wrap.append(existing, newName, label);
+    td.appendChild(wrap); tr.appendChild(td);
+  }
   function render(data) {
     current = data; rows.replaceChildren(); review.hidden = false;
-    summary.textContent = `${data.summary.total} rows · ${data.summary.ready} ready · ${data.summary.complete} already complete · ${data.summary.blocked} blocked`;
+    summary.textContent = `${data.summary.total} rows · ${data.summary.ready} ready · ${data.summary.review} need review · ${data.summary.complete} already complete · ${data.summary.blocked} blocked`;
     for (const item of data.rows) {
       const tr = document.createElement('tr');
       cell(tr, item.row.designators);
@@ -122,7 +149,8 @@
       cell(tr, item.product?.package);
       const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
       status.title = item.product?.description || '';
-      if (item.needs_category && item.status === 'ready') categoryControls(tr, item.row.row);
+      manufacturerControls(tr, item);
+      if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item.row.row);
       else cell(tr, item.part ? `Existing Part: ${item.part.name}` : '—');
       rows.appendChild(tr);
     }
@@ -134,14 +162,15 @@
     try {
       const form = new FormData(); form.append('file', file.files[0]);
       const data = await responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
-      render(data); show('Preview ready. Review the blocked rows and category choices before applying.', 'success');
+      render(data); show('Preview ready. Review mismatches, blocked rows and category choices before applying.', 'success');
     } catch (error) { show(error.message, 'error'); }
     finally { previewButton.disabled = false; }
   });
   applyButton.addEventListener('click', async () => {
     if (!current) return;
-    if (!window.confirm('Apply only the unblocked catalogue rows to this InvenTree instance?')) return;
+    if (!window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
     const categories = {};
+    const manufacturers = {};
     for (const wrap of document.querySelectorAll('.category')) {
       categories[wrap.dataset.row] = {
         existing_id: wrap.querySelector('.existing').value,
@@ -149,11 +178,18 @@
         parent_id: wrap.querySelector('.parent').value,
       };
     }
+    for (const wrap of document.querySelectorAll('.manufacturer-choice')) {
+      manufacturers[wrap.dataset.row] = {
+        existing_id: wrap.querySelector('.existing-manufacturer').value,
+        new_name: wrap.querySelector('.new-manufacturer').value.trim(),
+        confirm: wrap.querySelector('.confirm-equivalent').checked,
+      };
+    }
     applyButton.disabled = true; show('Rechecking source pages and saving catalogue records…');
     try {
       const data = await responseJson(await fetch('apply/', {
         method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
-        body: JSON.stringify({preview_token: current.preview_token, categories}),
+        body: JSON.stringify({preview_token: current.preview_token, categories, manufacturers}),
       }));
       const lines = [
         `${data.created_parts} Parts, ${data.created_categories} categories, ${data.created_manufacturers} manufacturers and ${data.created_supplier} JLCPCB supplier created.`,

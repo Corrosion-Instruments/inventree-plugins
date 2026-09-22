@@ -17,12 +17,17 @@ Upload the same CSV/XLSX format to preview manufacturer and supplier records.
 The `Footprint` column is treated as the expected manufacturer part number for
 this workflow, not as a PCB land-pattern value.
 
-The catalogue importer reads the public JLCPCB part-detail pages and requires
-an exact match between each page's `MFR.Part #` and the CSV `Footprint` value
-(ignoring only case and incidental whitespace). Missing pages, mismatches,
-duplicate identifiers, and conflicting existing InvenTree links are blocked.
+The catalogue importer reads the public JLCPCB part-detail pages. Exact matches
+between each page's `MFR.Part #` and the CSV `Footprint` value (ignoring only
+case and incidental whitespace) are ready automatically. Mismatches require
+the operator to select or create the manufacturer for the spreadsheet MPN and
+explicitly confirm that it is fully interchangeable with the JLCPCB MPN.
+The importer then adds both Manufacturer Part records to one internal Part;
+the JLCPCB C-code Supplier Part links to the JLCPCB Manufacturer Part. It does
+not infer the spreadsheet manufacturer's name from JLCPCB. Missing pages,
+duplicate identifiers, and conflicting existing InvenTree links remain blocked.
 The preview is read-only. Applying re-fetches and rechecks the source and local
-records inside a database transaction, skips blocked rows, and reuses existing
+records inside a database transaction, skips blocked or unapproved rows, and reuses existing
 Company, Part, Manufacturer Part, Supplier Part and Package-parameter records.
 The JLCPCB C-code is stored as the Supplier Part SKU; the manufacturer number
 is stored as the Manufacturer Part MPN. The part-page description is used for

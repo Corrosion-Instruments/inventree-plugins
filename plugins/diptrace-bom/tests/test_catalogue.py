@@ -7,6 +7,7 @@ from inventree_diptrace_bom.catalogue import (
     _company_metadata,
     _conflicting_codes,
     _is_jlcpcb_name,
+    _validate_manufacturer_choice,
     compare_row,
     parse_jlc_page,
 )
@@ -86,6 +87,20 @@ class CatalogueTests(unittest.TestCase):
         self.assertTrue(_is_jlcpcb_name("JLC PCB"))
         self.assertTrue(_is_jlcpcb_name("JLCPCB"))
         self.assertFalse(_is_jlcpcb_name("JLCPCB Europe"))
+
+    def test_alternate_mpn_requires_explicit_confirmation_and_manufacturer(self):
+        with self.assertRaisesRegex(CatalogueError, "Confirm"):
+            _validate_manufacturer_choice({"new_name": "Other Maker"})
+        with self.assertRaisesRegex(CatalogueError, "Select one"):
+            _validate_manufacturer_choice({"confirm": True})
+        with self.assertRaisesRegex(CatalogueError, "Select one"):
+            _validate_manufacturer_choice({"confirm": True, "existing_id": "3", "new_name": "Other Maker"})
+        self.assertEqual(_validate_manufacturer_choice({"confirm": True, "existing_id": "3"}), (3, ""))
+        self.assertEqual(_validate_manufacturer_choice({"confirm": True, "new_name": "  Other   Maker "}), (None, "Other Maker"))
+
+    def test_alternate_mpn_rejects_invalid_manufacturer_id(self):
+        with self.assertRaisesRegex(CatalogueError, "ID is invalid"):
+            _validate_manufacturer_choice({"confirm": True, "existing_id": "not-an-id"})
 
 
 if __name__ == "__main__":

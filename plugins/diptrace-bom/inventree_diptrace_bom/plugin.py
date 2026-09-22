@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.4.1"
+    VERSION = "0.5.0"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -184,7 +184,14 @@ class DipTraceBomPlugin(
             rows = [row.as_dict() for row in parse_bom(uploaded, uploaded.name)]
             result = self._catalogue_service().preview(rows)
             result["preview_token"] = signing.dumps(
-                {"rows": rows, "user": request.user.pk},
+                {
+                    "rows": rows,
+                    "user": request.user.pk,
+                    "reviewed_mpns": {
+                        str(item["row"]["row"]): item["product"]["mpn"]
+                        for item in result["rows"] if item["product"]
+                    },
+                },
                 salt="inventree-diptrace-catalogue-preview",
                 compress=True,
             )
@@ -208,9 +215,14 @@ class DipTraceBomPlugin(
             if preview.get("user") != request.user.pk:
                 return JsonResponse({"error": "Preview belongs to another user"}, status=403)
             category_ids = data.get("categories") or {}
-            if not isinstance(category_ids, dict) or not isinstance(preview.get("rows"), list):
+            manufacturer_choices = data.get("manufacturers") or {}
+            reviewed_mpns = preview.get("reviewed_mpns")
+            if (not isinstance(category_ids, dict) or not isinstance(manufacturer_choices, dict)
+                    or not isinstance(reviewed_mpns, dict) or not isinstance(preview.get("rows"), list)):
                 raise CatalogueError("Invalid catalogue preview data")
-            result = self._catalogue_service().apply(preview["rows"], category_ids, request.user)
+            result = self._catalogue_service().apply(
+                preview["rows"], category_ids, manufacturer_choices, reviewed_mpns, request.user
+            )
             return JsonResponse(result)
         except signing.SignatureExpired:
             return JsonResponse({"error": "Preview expired; upload the BOM again"}, status=400)
