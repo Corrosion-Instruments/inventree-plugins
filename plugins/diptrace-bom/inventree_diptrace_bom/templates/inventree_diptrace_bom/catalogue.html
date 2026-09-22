@@ -310,7 +310,8 @@
       const makerCell = cell(tr, item.product?.manufacturer);
       if (item.product?.source) {
         const note = document.createElement('small'); note.className = 'source-note';
-        note.textContent = item.product.source === 'api' ? 'JLC API' :
+        note.textContent = item.product.source === 'api' ?
+          (item.product.description ? 'JLC API' : 'JLC API; description unavailable') :
           item.product.source === 'api+page' ? 'JLC API; missing fields from page' : 'JLC page fallback';
         makerCell.appendChild(note);
       }

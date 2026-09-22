@@ -19,15 +19,16 @@ this workflow, not as a PCB land-pattern value.
 
 When JLCPCB Open API credentials are configured, the catalogue importer uses
 one batch API lookup for component identity, manufacturer name, package and
-description. The API manufacturer name is kept exactly as returned, including
+description when available. The API manufacturer name is kept exactly as returned, including
 any bilingual suffix; it is not shortened to the page's display name. If an
-API record lacks a required field, the importer fetches that part's public
+API record lacks a required identity or package field, the importer fetches that part's public
 JLCPCB page to fill the gap while retaining the API manufacturer name. An API
 MPN or package that disagrees with a fetched page blocks that row. Without
 configured API access, the public page remains the fallback source. The
 preview identifies which source supplied each row. Existing catalogue links
 that conflict with a newly returned API manufacturer are never silently
-repointed.
+repointed. A missing API description is left blank without fetching the page;
+such a row can still be complete on later previews.
 
 Exact matches
 between JLCPCB's manufacturer number and the CSV `Footprint` value (ignoring only

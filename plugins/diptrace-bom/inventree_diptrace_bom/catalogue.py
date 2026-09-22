@@ -158,7 +158,7 @@ class CatalogueImportService:
         mpn = str(record.get("componentModel") or "").strip()
         package = str(record.get("componentSpecification") or "").strip()
         description = str(record.get("description") or "").strip()
-        if not all((manufacturer, mpn, package, description)):
+        if not all((manufacturer, mpn, package)):
             page = self.client.fetch(code)
             if mpn and normalize_identifier(mpn) != normalize_identifier(page.mpn):
                 raise CatalogueError(f"JLCPCB API and page disagree on the MPN for {code}")
@@ -317,7 +317,8 @@ class CatalogueImportService:
             if len(values) > 1 or (values and normalize_identifier(values[0].data) != normalize_identifier(product.package)):
                 return _blocked("Existing Part has a different Package parameter")
             has_package = bool(values)
-        if part and part.locked and (not maker_part or not supplier_part or not has_package or not part.description
+        if part and part.locked and (not maker_part or not supplier_part or not has_package
+                                    or (product.description and not part.description)
                                     or (sheet_manufacturer and not sheet_part) or (maker_part and not maker_part.link)
                                     or (sheet_link and sheet_part and not sheet_part.link)):
             return _blocked("Existing Part is locked and would need catalogue changes")
@@ -331,7 +332,7 @@ class CatalogueImportService:
                         and maker_part.link
                         and (not sheet_link or (sheet_part and sheet_part.link == sheet_link))
                         and supplier_part.manufacturer_part_id == maker_part.pk
-                        and part.description and not company_metadata_missing)
+                        and (part.description or not product.description) and not company_metadata_missing)
         return {
             "status": "complete" if complete else "ready",
             "reason": "All catalogue records already exist" if complete else "Ready to create missing catalogue records",

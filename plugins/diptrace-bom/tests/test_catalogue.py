@@ -69,18 +69,31 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(part.manufacturer, "TXGA(特思嘉)")
         self.assertEqual(part.source, "api")
 
-    def test_page_fills_missing_api_description_without_replacing_api_maker(self):
+    def test_missing_api_description_is_left_blank_without_page_fetch(self):
+        class PageClient:
+            def fetch(self, code):
+                raise AssertionError("A missing description must not fetch HTML")
+
+        record = {"componentCode": "C49420596", "componentModel": "FBB04009-M24S1143BKM",
+                  "componentBrandEn": "TXGA(特思嘉)", "componentSpecification": "SMD-24P"}
+        part = CatalogueImportService(client=PageClient())._fetch_product("C49420596", record)
+        self.assertEqual(part.manufacturer, "TXGA(特思嘉)")
+        self.assertEqual(part.description, "")
+        self.assertEqual(part.source, "api")
+
+    def test_page_fills_missing_required_api_fields_without_replacing_api_maker(self):
         class PageClient:
             def fetch(self, code):
                 return JlcPart(code, "TXGA", "FBB04009-M24S1143BKM", "SMD-24P SMT ROHS",
                                "SMD-24P", f"https://jlcpcb.com/partdetail/{code}")
 
         record = {"componentCode": "C49420596", "componentModel": "FBB04009-M24S1143BKM",
-                  "componentBrandEn": "TXGA(特思嘉)", "componentSpecification": "SMD-24P"}
+                  "componentBrandEn": "TXGA(特思嘉)"}
         service = CatalogueImportService(client=PageClient())
         part = service._fetch_product("C49420596", record)
         self.assertEqual(part.manufacturer, "TXGA(特思嘉)")
         self.assertEqual(part.description, "SMD-24P SMT ROHS")
+        self.assertEqual(part.package, "SMD-24P")
         self.assertEqual(part.source, "api+page")
         with self.assertRaisesRegex(CatalogueError, "disagree on the MPN"):
             service._fetch_product("C49420596", {**record, "componentModel": "OTHER"})
