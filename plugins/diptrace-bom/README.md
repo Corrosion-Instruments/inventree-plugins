@@ -27,6 +27,10 @@ The importer then adds both Manufacturer Part records to one internal Part;
 the JLCPCB C-code Supplier Part links to the JLCPCB Manufacturer Part. It does
 not infer the spreadsheet manufacturer's name from JLCPCB. Missing pages,
 duplicate identifiers, and conflicting existing InvenTree links remain blocked.
+If an existing company named by JLCPCB or selected for the spreadsheet MPN is
+not marked as a manufacturer, the preview offers a separate, explicit checkbox
+to mark that company as a manufacturer on apply. The supplier role and other
+company fields are retained.
 The preview is read-only. Applying re-fetches and rechecks the source and local
 records inside a database transaction, skips blocked or unapproved rows, and reuses existing
 Company, Part, Manufacturer Part, Supplier Part and Package-parameter records.

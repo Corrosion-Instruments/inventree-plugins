@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.5.1"
+    VERSION = "0.5.2"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -191,6 +191,10 @@ class DipTraceBomPlugin(
                         str(item["row"]["row"]): item["product"]["mpn"]
                         for item in result["rows"] if item["product"]
                     },
+                    "reviewed_manufacturers": {
+                        str(item["row"]["row"]): item["product"]["manufacturer"]
+                        for item in result["rows"] if item["product"]
+                    },
                 },
                 salt="inventree-diptrace-catalogue-preview",
                 compress=True,
@@ -217,11 +221,14 @@ class DipTraceBomPlugin(
             category_ids = data.get("categories") or {}
             manufacturer_choices = data.get("manufacturers") or {}
             reviewed_mpns = preview.get("reviewed_mpns")
+            reviewed_manufacturers = preview.get("reviewed_manufacturers")
             if (not isinstance(category_ids, dict) or not isinstance(manufacturer_choices, dict)
-                    or not isinstance(reviewed_mpns, dict) or not isinstance(preview.get("rows"), list)):
+                    or not isinstance(reviewed_mpns, dict) or not isinstance(reviewed_manufacturers, dict)
+                    or not isinstance(preview.get("rows"), list)):
                 raise CatalogueError("Invalid catalogue preview data")
             result = self._catalogue_service().apply(
-                preview["rows"], category_ids, manufacturer_choices, reviewed_mpns, request.user
+                preview["rows"], category_ids, manufacturer_choices, reviewed_mpns,
+                reviewed_manufacturers, request.user
             )
             return JsonResponse(result)
         except signing.SignatureExpired:
