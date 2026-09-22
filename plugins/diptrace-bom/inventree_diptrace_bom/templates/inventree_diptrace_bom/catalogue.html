@@ -32,6 +32,11 @@
     .category, .manufacturer-choice { min-width: 230px; display: grid; gap: 5px; }
     .category small, .manufacturer-choice small { color: #53657d; }
     .confirmation { display: flex; gap: 6px; align-items: flex-start; font-weight: normal; }
+    .copy-line { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+    .copy-line span { overflow-wrap: anywhere; }
+    .copy-button { flex: 0 0 auto; padding: 2px; color: #2463dc; background: transparent; border: 1px solid transparent; }
+    .copy-button:hover, .copy-button:focus-visible { background: #edf2fa; border-color: #b8c6d9; }
+    .copy-feedback { color: #12643b; font-size: 12px; }
     #message { white-space: pre-wrap; }
     .error { color: #a72b2b; }
     .success { color: #12643b; }
@@ -88,6 +93,40 @@
   }
   function cell(tr, value) {
     const td = document.createElement('td'); td.textContent = value || '—'; tr.appendChild(td); return td;
+  }
+  function copyCell(tr, value, label) {
+    if (!value) return cell(tr, value);
+    const td = document.createElement('td');
+    const line = document.createElement('div'); line.className = 'copy-line';
+    const number = document.createElement('span'); number.textContent = value;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'copy-button';
+    button.title = `Copy ${label}`;
+    button.setAttribute('aria-label', `Copy ${label} ${value}`);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '16'); svg.setAttribute('height', '16');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const [x, y] of [[5, 4], [8, 7]]) {
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', '11'); rect.setAttribute('height', '13'); rect.setAttribute('rx', '2');
+      svg.appendChild(rect);
+    }
+    button.appendChild(svg);
+    const feedback = document.createElement('small'); feedback.className = 'copy-feedback'; feedback.hidden = true;
+    feedback.setAttribute('role', 'status');
+    let timer;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(value);
+        feedback.textContent = 'Copied';
+      } catch {
+        feedback.textContent = 'Copy failed; select the value manually';
+      }
+      feedback.hidden = false;
+      clearTimeout(timer); timer = setTimeout(() => { feedback.hidden = true; }, 2500);
+    });
+    line.append(number, button); td.append(line, feedback); tr.appendChild(td); return td;
   }
   function categoryControls(tr, rowNumber) {
     const td = document.createElement('td');
@@ -169,8 +208,8 @@
       const tr = document.createElement('tr');
       cell(tr, item.row.designators);
       cell(tr, item.row.jlcpcb_part);
-      cell(tr, item.row.footprint);
-      cell(tr, item.product?.mpn);
+      copyCell(tr, item.row.footprint, 'Sheet Footprint / MPN');
+      copyCell(tr, item.product?.mpn, 'JLC MFR Part #');
       cell(tr, item.product?.manufacturer);
       cell(tr, item.product?.package);
       const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
