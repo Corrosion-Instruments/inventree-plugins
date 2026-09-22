@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.5.9"
+    VERSION = "0.6.0"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -184,10 +184,11 @@ class DipTraceBomPlugin(
             rows = [row.as_dict() for row in parse_bom(uploaded, uploaded.name)]
             try:
                 overrides = json.loads(request.POST.get("mpn_overrides", "{}"))
+                source_choices = json.loads(request.POST.get("source_choices", "{}"))
             except json.JSONDecodeError as exc:
-                raise CatalogueError("Invalid spreadsheet MPN edits") from exc
+                raise CatalogueError("Invalid catalogue preview choices") from exc
             rows = apply_sheet_mpn_overrides(rows, overrides)
-            result = self._catalogue_service().preview(rows)
+            result = self._catalogue_service().preview(rows, source_choices)
             result["preview_token"] = signing.dumps(
                 {
                     "rows": rows,
@@ -199,6 +200,11 @@ class DipTraceBomPlugin(
                     "reviewed_manufacturers": {
                         str(item["row"]["row"]): item["product"]["manufacturer"]
                         for item in result["rows"] if item["product"]
+                    },
+                    "source_choices": source_choices,
+                    "reviewed_source_modes": {
+                        str(item["row"]["row"]): item["source_mode"]
+                        for item in result["rows"]
                     },
                 },
                 salt="inventree-diptrace-catalogue-preview",
@@ -228,14 +234,18 @@ class DipTraceBomPlugin(
             sheet_links = data.get("sheet_links") or {}
             reviewed_mpns = preview.get("reviewed_mpns")
             reviewed_manufacturers = preview.get("reviewed_manufacturers")
+            source_choices = preview.get("source_choices")
+            reviewed_source_modes = preview.get("reviewed_source_modes")
             if (not isinstance(category_ids, dict) or not isinstance(manufacturer_choices, dict)
                     or not isinstance(sheet_links, dict)
                     or not isinstance(reviewed_mpns, dict) or not isinstance(reviewed_manufacturers, dict)
+                    or not isinstance(source_choices, dict) or not isinstance(reviewed_source_modes, dict)
                     or not isinstance(preview.get("rows"), list)):
                 raise CatalogueError("Invalid catalogue preview data")
             result = self._catalogue_service().apply(
                 preview["rows"], category_ids, manufacturer_choices, sheet_links, reviewed_mpns,
-                reviewed_manufacturers, request.user, only_row=data.get("row_number")
+                reviewed_manufacturers, source_choices, reviewed_source_modes,
+                request.user, only_row=data.get("row_number")
             )
             return JsonResponse(result)
         except signing.SignatureExpired:

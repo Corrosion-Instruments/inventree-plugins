@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, replace
+from decimal import Decimal
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
+
+from .jlcpcb import private_stock_quantities
 
 
 CODE_RE = re.compile(r"C[1-9][0-9]*\Z", re.IGNORECASE)
@@ -140,6 +143,15 @@ def compare_row(row: dict, product: JlcPart) -> str | None:
     return None
 
 
+def consignment_source(quantity: str, chosen_source: str | None = None) -> str:
+    """A positive balance proves consigned stock; zero needs an explicit choice."""
+    if chosen_source not in (None, "catalogue", "consigned"):
+        raise CatalogueError("Invalid JLCPCB source choice")
+    if Decimal(quantity) > 0:
+        return "consigned"
+    return chosen_source or "unknown"
+
+
 class CatalogueImportService:
     """Plan and apply idempotent InvenTree catalogue records."""
 
@@ -180,6 +192,21 @@ class CatalogueImportService:
         except Exception:
             return {}
 
+    def _consigned_quantities(self, codes: set[str]) -> dict[str, str]:
+        """Read the account's current consigned balances, not mirrored local stock."""
+        if not codes:
+            return {}
+        if not self.api_client:
+            raise CatalogueError("JLCPCB API credentials are required to check consigned parts")
+        try:
+            library = self.api_client.private_library()
+            return {
+                code: str(private_stock_quantities(library.get(code))["consigned"])
+                for code in codes
+            }
+        except Exception as exc:
+            raise CatalogueError(f"Could not verify JLCPCB consigned balances: {exc}") from exc
+
     def _fetch_product(self, code: str, record: dict | None) -> JlcPart:
         """Prefer JLC API facts, using the page only for missing fields."""
         if not isinstance(record, dict) or not record:
@@ -208,14 +235,23 @@ class CatalogueImportService:
                        description=description, package=package,
                        url=f"https://jlcpcb.com/partdetail/{code}", source=source)
 
-    def preview(self, rows: list[dict]) -> dict:
+    def preview(self, rows: list[dict], source_choices: dict | None = None) -> dict:
         from company.models import Company, ManufacturerPart
         from part.models import PartCategory
 
         if not rows or len(rows) > MAX_ROWS:
             raise CatalogueError(f"Upload between 1 and {MAX_ROWS} component rows")
+        if source_choices is None:
+            source_choices = {}
+        known_rows = {str(row["row"]) for row in rows}
+        if (not isinstance(source_choices, dict) or set(source_choices) - known_rows
+                or any(value not in {"catalogue", "consigned"} for value in source_choices.values())):
+            raise CatalogueError("Invalid JLCPCB source choices")
+        codes = {str(row.get("jlcpcb_part") or "").upper() for row in rows
+                 if CODE_RE.fullmatch(str(row.get("jlcpcb_part") or "").upper())}
         duplicate_codes = _conflicting_codes(rows)
-        api_metadata = self._api_metadata(sorted({str(row.get("jlcpcb_part") or "").upper() for row in rows if CODE_RE.fullmatch(str(row.get("jlcpcb_part") or "").upper())}))
+        api_metadata = self._api_metadata(sorted(codes))
+        consigned_quantities = self._consigned_quantities(codes)
         fetched: dict[str, JlcPart | CatalogueError] = {}
         results = []
         for row in rows:
@@ -223,7 +259,8 @@ class CatalogueImportService:
             result = {"row": row, "status": "blocked", "reason": "", "product": None, "part": None,
                       "manufacturer_parts": [],
                       "needs_category": False, "needs_sheet_manufacturer": False,
-                      "needs_jlc_manufacturer": False}
+                      "needs_jlc_manufacturer": False, "needs_source_choice": False,
+                      "source_mode": "unknown", "consigned_quantity": consigned_quantities.get(code, "0")}
             if code in duplicate_codes:
                 result["reason"] = "The same JLCPCB code has different manufacturer numbers in this file"
             elif not CODE_RE.fullmatch(code):
@@ -242,14 +279,26 @@ class CatalogueImportService:
                     product = replace(product, **metadata)
                     result["product"] = product.as_dict()
                     mismatch = compare_row(row, product)
-                    if len(reviewed_sheet_mpn(row)) > 100:
+                    positive_consignment = Decimal(result["consigned_quantity"]) > 0
+                    chosen_source = source_choices.get(str(row["row"]))
+                    source_mode = consignment_source(result["consigned_quantity"], chosen_source)
+                    result["source_mode"] = source_mode
+                    result["needs_source_choice"] = bool(mismatch and not positive_consignment)
+                    if source_mode == "consigned" and len(reviewed_sheet_mpn(row)) > 100:
                         result["reason"] = "Spreadsheet MPN exceeds 100 characters; edit it and check again"
-                    elif not reviewed_sheet_mpn(row):
+                    elif source_mode == "consigned" and not reviewed_sheet_mpn(row):
                         result["reason"] = mismatch
                     else:
                         result.update(self._plan_product(product))
-                        needs_sheet = bool(mismatch)
+                        needs_sheet = bool(mismatch and source_mode == "consigned")
                         result["needs_sheet_manufacturer"] = needs_sheet
+                        if result["needs_source_choice"] and source_mode == "unknown" and result["status"] != "blocked":
+                            result.update(status="review", reason=(
+                                "JLC reports zero consigned units. That does not prove this is an ordinary catalogue part; "
+                                "choose its source and check again."
+                            ))
+                        elif mismatch and source_mode == "catalogue" and result["status"] != "blocked":
+                            result["reason"] = "Ordinary JLC catalogue part selected; spreadsheet MPN is not imported"
                         if needs_sheet and result["part"] and result["status"] == "complete":
                             # A previous import may already have attached the interchangeable
                             # sheet MPN to this same Part. Do not demand approval again.
@@ -388,7 +437,8 @@ class CatalogueImportService:
 
     def apply(self, rows: list[dict], category_ids: dict, manufacturer_choices: dict,
               sheet_links: dict,
-              reviewed_mpns: dict, reviewed_manufacturers: dict, user, only_row=None) -> dict:
+              reviewed_mpns: dict, reviewed_manufacturers: dict, source_choices: dict,
+              reviewed_source_modes: dict, user, only_row=None) -> dict:
         """Re-fetch source facts and re-plan inside one transaction before writing."""
         from common.models import Parameter, ParameterTemplate
         from company.models import Company, ManufacturerPart, SupplierPart
@@ -400,9 +450,11 @@ class CatalogueImportService:
         if not getattr(user, "is_superuser", False):
             raise CatalogueError("A superuser is required to apply catalogue imports")
         rows = _select_apply_rows(rows, only_row)
+        selected_keys = {str(row["row"]) for row in rows}
+        source_choices = {key: value for key, value in source_choices.items() if key in selected_keys}
         # Network lookups finish before opening the database transaction.
         # Source identities are fetched again here, independent of the signed preview.
-        preview = self.preview(rows)
+        preview = self.preview(rows, source_choices)
         with transaction.atomic():
             content_type = ContentType.objects.get_for_model(Part)
             output = {"created_parts": 0, "created_categories": 0, "created_manufacturers": 0,
@@ -415,6 +467,12 @@ class CatalogueImportService:
                 row_key = str(row["row"])
                 if item["status"] == "blocked":
                     output["skipped"].append({"code": code, "reason": item["reason"]})
+                    continue
+                if item["source_mode"] != reviewed_source_modes.get(row_key):
+                    output["skipped"].append({"code": code, "reason": "JLCPCB consignment source changed since preview; check this row again"})
+                    continue
+                if item["needs_source_choice"] and item["source_mode"] == "unknown":
+                    output["skipped"].append({"code": code, "reason": "Choose ordinary JLC catalogue or consigned for this zero-balance part, then check again"})
                     continue
                 product = JlcPart(**item["product"])
                 if normalize_identifier(reviewed_mpns.get(row_key)) != normalize_identifier(product.mpn):

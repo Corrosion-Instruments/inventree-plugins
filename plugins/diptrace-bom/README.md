@@ -22,22 +22,33 @@ The importer does not guess or strip prefixes. Saving is disabled for an edited
 MPN until it has been rechecked. Edits are retained in this browser for the
 same file and are signed into the checked preview used for saving.
 
-When JLCPCB Open API credentials are configured, the catalogue importer uses
-one batch API lookup for component identity, manufacturer name, package and
+JLCPCB Open API credentials are required for the catalogue importer to check
+consigned stock. It reads the account's private component library and uses one
+batch API lookup for component identity, manufacturer name, package and
 description when available. The API manufacturer name is kept exactly as returned, including
 any bilingual suffix; it is not shortened to the page's display name. If an
 API record lacks a required identity or package field, the importer fetches that part's public
 JLCPCB page to fill the gap while retaining the API manufacturer name. An API
-MPN or package that disagrees with a fetched page blocks that row. Without
-configured API access, the public page remains the fallback source. The
+MPN or package that disagrees with a fetched page blocks that row. If the
+component-details API omits a record, the public page remains the fallback source. The
 preview identifies which source supplied each row. Existing catalogue links
 that conflict with a newly returned API manufacturer are never silently
 repointed. A missing API description is left blank without fetching the page;
 such a row can still be complete on later previews.
 
-Exact matches
-between JLCPCB's manufacturer number and the reviewed Spreadsheet MPN (ignoring only
-case and incidental whitespace) are ready automatically. Mismatches require
+If JLCPCB reports a positive `consignedParts` quantity for a C-code, the importer
+requires comparison with the reviewed Spreadsheet MPN. A zero quantity does not
+prove the part is not consigned: if the two MPNs differ, choose **Ordinary JLC
+catalogue** (ignore the spreadsheet MPN) or **Consigned part** (review both MPNs),
+then click **Check source**. The choice is retained with the browser draft and
+signed preview; apply fetches the private library again and skips a row if its
+source classification changes. Matching MPNs need no source choice because the
+same JLC manufacturer record is created either way. Existing alternate MPN
+records are never deleted by choosing ordinary catalogue.
+
+For consigned rows, exact matches between JLCPCB's manufacturer number and the
+reviewed Spreadsheet MPN (ignoring only case and incidental whitespace) are ready
+automatically. Consigned mismatches require
 the operator to search for an existing manufacturer or type a new manufacturer
 name for the spreadsheet MPN in one field, then explicitly confirm that it is
 fully interchangeable with the JLCPCB MPN. The two MPNs may have the same

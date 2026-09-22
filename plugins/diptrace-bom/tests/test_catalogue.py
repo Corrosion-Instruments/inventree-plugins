@@ -18,6 +18,7 @@ from inventree_diptrace_bom.catalogue import (
     _select_apply_rows,
     _validate_manufacturer_choice,
     compare_row,
+    consignment_source,
     group_manufacturer_parts,
     parse_jlc_page,
     reviewed_sheet_mpn,
@@ -63,6 +64,34 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("100MΩ", part.description)
         self.assertIsNone(compare_row({"footprint": "crha2512af100mfkef"}, part))
         self.assertIn("differs", compare_row({"footprint": "wrong part"}, part))
+
+    def test_consignment_balance_is_positive_evidence_not_a_zero_balance_type(self):
+        self.assertEqual(consignment_source("1236"), "consigned")
+        self.assertEqual(consignment_source("1236", "catalogue"), "consigned")
+        self.assertEqual(consignment_source("0"), "unknown")
+        self.assertEqual(consignment_source("0", "catalogue"), "catalogue")
+        self.assertEqual(consignment_source("0", "consigned"), "consigned")
+        with self.assertRaisesRegex(CatalogueError, "Invalid JLCPCB source choice"):
+            consignment_source("0", "global")
+
+    def test_catalogue_reads_private_library_balances_not_inventree_stock(self):
+        class ApiClient:
+            def private_library(self):
+                return {"C1973675": {"consignedParts": 1236},
+                        "C47117621": {"consignedParts": 0}}
+
+        quantities = CatalogueImportService(api_client=ApiClient())._consigned_quantities(
+            {"C1973675", "C47117621", "C1546"})
+        self.assertEqual(quantities, {"C1973675": "1236", "C47117621": "0", "C1546": "0"})
+        with self.assertRaisesRegex(CatalogueError, "credentials are required"):
+            CatalogueImportService()._consigned_quantities({"C1546"})
+
+        class FailedApiClient:
+            def private_library(self):
+                raise RuntimeError("network failed")
+
+        with self.assertRaisesRegex(CatalogueError, "Could not verify"):
+            CatalogueImportService(api_client=FailedApiClient())._consigned_quantities({"C1546"})
 
     def test_api_manufacturer_is_authoritative_and_complete_api_skips_page(self):
         class PageClient:

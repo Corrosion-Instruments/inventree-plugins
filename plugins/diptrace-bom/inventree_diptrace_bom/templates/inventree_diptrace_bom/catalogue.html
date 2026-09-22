@@ -46,6 +46,9 @@
     .sheet-mpn-field { display: grid; gap: 4px; margin-top: 8px; min-width: 205px; }
     .sheet-mpn-field label { color: #53657d; font-size: 12px; }
     .sheet-mpn-field button { justify-self: start; padding: 5px 9px; }
+    .source-choice { min-width: 200px; display: grid; gap: 5px; }
+    .source-choice small { color: #53657d; }
+    .source-choice button { justify-self: start; padding: 5px 9px; }
     .unchecked-note { color: #8a5200; font-size: 12px; }
     .source-link { display: inline-block; margin-top: 4px; }
     .source-note { display: block; margin-top: 4px; color: #53657d; font-size: 11px; }
@@ -60,7 +63,7 @@
 <body>
 <main>
   <h1>JLC Part Catalogue Import</h1>
-  <p class="muted">Upload a DipTrace CSV/XLSX file. The original Footprint stays unchanged; edit the spreadsheet MPN for any row that includes a CAD prefix, then Check again before saving. Mismatches need explicit review.</p>
+  <p class="muted">Upload a DipTrace CSV/XLSX file. JLCPCB's private-library API supplies current consigned quantities. Positive consigned stock triggers spreadsheet-MPN review; zero stock is not proof of an ordinary catalogue part. Edit CAD-prefixed MPNs and check again before saving.</p>
   <section class="card">
     <div class="toolbar">
       <label for="file">BOM file</label>
@@ -71,9 +74,9 @@
   <section id="review" class="card" hidden>
     <h2>Review</h2>
     <p id="summary"></p>
-    <p class="muted">For each new Part, choose or create a category. The editable spreadsheet MPN is checked separately from the original DipTrace Footprint. When MPNs differ, choose their manufacturer—even if it is the same as the JLC manufacturer—and confirm interchangeability. The JLCPCB link is saved automatically; an optional spreadsheet MPN link can be added. Unsaved edits stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
+    <p class="muted">For each new Part, choose or create a category. The original DipTrace Footprint stays visible. Positive JLC consigned stock requires a spreadsheet-MPN comparison; when the consigned balance is zero and MPNs differ, choose ordinary JLC catalogue or consigned and recheck. Only consigned mismatches need a second manufacturer and interchangeability confirmation. The JLCPCB link is saved automatically; an optional spreadsheet MPN link can be added. Unsaved edits stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
+      <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Consigned source</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <p><button id="apply" type="button">Apply approved rows</button></p>
@@ -244,11 +247,34 @@
     savedManufacturerParts(td, item);
     tr.appendChild(td);
   }
+  function sourceControls(tr, item) {
+    const td = document.createElement('td');
+    const quantity = Number(item.consigned_quantity || 0);
+    if (quantity > 0) {
+      td.textContent = `Consigned: ${quantity.toLocaleString()} on hand (JLC API)`;
+    } else if (item.needs_source_choice) {
+      const wrap = document.createElement('div'); wrap.className = 'source-choice';
+      const select = document.createElement('select'); select.className = 'source-select';
+      select.setAttribute('aria-label', `JLC source for row ${item.row.row}`);
+      select.append(option('', 'Choose source'), option('catalogue', 'Ordinary JLC catalogue'),
+        option('consigned', 'Consigned part'));
+      select.value = item.source_mode === 'unknown' ? '' : item.source_mode;
+      const note = document.createElement('small');
+      note.textContent = 'JLC reports zero consigned units; this is not a permanent type flag.';
+      const check = document.createElement('button'); check.type = 'button'; check.className = 'check-source';
+      check.textContent = 'Check source';
+      wrap.append(select, note, check); td.appendChild(wrap);
+    } else {
+      td.textContent = 'No consigned stock reported; MPNs match';
+    }
+    tr.appendChild(td);
+  }
   function choicesFor(tr) {
     const category = tr.querySelector('.category');
     const manufacturer = tr.querySelector('.manufacturer-choice');
     return {
       sheet_mpn: tr.querySelector('.sheet-mpn')?.value.trim() ?? '',
+      source_choice: tr.querySelector('.source-select')?.value || '',
       category: category ? {
         existing_id: category.querySelector('.existing').value,
         new_name: category.querySelector('.new-name').value.trim(),
@@ -285,6 +311,10 @@
     if (!choice || typeof choice !== 'object') return;
     const sheetMpn = tr.querySelector('.sheet-mpn');
     if (sheetMpn && typeof choice.sheet_mpn === 'string') sheetMpn.value = choice.sheet_mpn;
+    const source = tr.querySelector('.source-select');
+    if (source && [...source.options].some(option => option.value === choice.source_choice)) {
+      source.value = choice.source_choice;
+    }
     const category = tr.querySelector('.category');
     if (category && choice.category) {
       const saved = choice.category;
@@ -337,6 +367,7 @@
       unchecked.textContent = 'Changed: check again before saving.'; unchecked.hidden = true;
       mpnWrap.append(mpnLabel, mpnInput, check, unchecked); sheetCell.appendChild(mpnWrap);
       tr.dataset.reviewedMpn = item.row.sheet_mpn ?? item.row.footprint;
+      tr.dataset.reviewedSource = item.source_mode === 'unknown' ? '' : item.source_mode;
       if (item.status === 'review' && item.needs_sheet_manufacturer) {
         externalLinkField(sheetCell, item.row.row, 'sheet', 'Spreadsheet MPN link (optional)');
       }
@@ -355,6 +386,7 @@
         makerCell.appendChild(note);
       }
       cell(tr, item.product?.package);
+      sourceControls(tr, item);
       const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
       status.title = item.product?.description || '';
       manufacturerControls(tr, item);
@@ -375,9 +407,10 @@
   function updatePendingRows() {
     let pending = false;
     for (const tr of rows.querySelectorAll('tr[data-row]')) {
-      const changed = tr.querySelector('.sheet-mpn').value.trim() !== tr.dataset.reviewedMpn;
+      const changed = (tr.querySelector('.sheet-mpn').value.trim() !== tr.dataset.reviewedMpn
+        || (tr.querySelector('.source-select')?.value || '') !== (tr.dataset.reviewedSource || ''));
       pending ||= changed;
-      tr.querySelector('.unchecked-note').hidden = !changed;
+      tr.querySelector('.unchecked-note').hidden = tr.querySelector('.sheet-mpn').value.trim() === tr.dataset.reviewedMpn;
       const save = tr.querySelector('.save-item');
       if (save) save.disabled = busy || changed;
     }
@@ -405,17 +438,20 @@
   }
   async function previewFile(draft = loadDraft()) {
     const form = new FormData(); form.append('file', file.files[0]);
-    const overrides = {};
+    const overrides = {}, sourceChoices = {};
     for (const [row, choice] of Object.entries(draft)) {
       if (typeof choice?.sheet_mpn === 'string') overrides[row] = choice.sheet_mpn;
+      if (choice?.source_choice) sourceChoices[row] = choice.source_choice;
     }
     form.append('mpn_overrides', JSON.stringify(overrides));
+    form.append('source_choices', JSON.stringify(sourceChoices));
     return responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
   }
   function setBusy(value) {
     busy = value; previewButton.disabled = value; applyButton.disabled = value;
     for (const button of rows.querySelectorAll('.save-item')) button.disabled = value;
     for (const button of rows.querySelectorAll('.check-mpn')) button.disabled = value;
+    for (const button of rows.querySelectorAll('.check-source')) button.disabled = value;
     if (!value) updatePendingRows();
   }
   function resultText(data) {
@@ -454,10 +490,10 @@
     }
     persistDraft(); updatePendingRows();
   });
-  rows.addEventListener('change', persistDraft);
+  rows.addEventListener('change', () => { persistDraft(); updatePendingRows(); });
   async function applyRows(rowNumber = null) {
     if (busy || !current) return;
-    if (updatePendingRows()) return show('A spreadsheet MPN changed. Click Check again before saving.', 'error');
+    if (updatePendingRows()) return show('A spreadsheet MPN or source choice changed. Check it again before saving.', 'error');
     if (rowNumber === null && !window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
     const draft = persistDraft();
     const payload = collectPayload(rowNumber);
@@ -488,14 +524,14 @@
     finally { setBusy(false); }
   }
   rows.addEventListener('click', event => {
-    const check = event.target.closest('.check-mpn');
+    const check = event.target.closest('.check-mpn, .check-source');
     if (check) {
       if (busy) return;
       const draft = persistDraft();
-      setBusy(true); show('Checking edited spreadsheet MPNs against JLCPCB and InvenTree…');
+      setBusy(true); show('Checking spreadsheet MPNs and JLC source choices…');
       previewFile(draft).then(data => {
         render(data, draft);
-        show('MPNs rechecked. Review the updated decisions before saving.', 'success');
+        show('MPNs and source choices rechecked. Review the updated decisions before saving.', 'success');
       }).catch(error => show(error.message, 'error')).finally(() => setBusy(false));
       return;
     }
