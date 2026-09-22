@@ -9,6 +9,38 @@ This plugin provides a guarded workflow for turning a DipTrace CSV/XLSX export i
 5. Manually resolve ambiguous/unmatched rows (or explicitly create them when enabled).
 6. Merge into or replace the assembly BOM in one database transaction.
 
+## Separate JLC part catalogue importer
+
+The plugin also provides **JLC Part Catalogue**, a separate page at
+`/plugin/diptrace-bom/catalogue/`. The original BOM importer page is unchanged.
+Upload the same CSV/XLSX format to preview manufacturer and supplier records.
+The `Footprint` column is treated as the expected manufacturer part number for
+this workflow, not as a PCB land-pattern value.
+
+The catalogue importer reads the public JLCPCB part-detail pages and requires
+an exact match between each page's `MFR.Part #` and the CSV `Footprint` value
+(ignoring only case and incidental whitespace). Missing pages, mismatches,
+duplicate identifiers, and conflicting existing InvenTree links are blocked.
+The preview is read-only. Applying re-fetches and rechecks the source and local
+records inside a database transaction, skips blocked rows, and reuses existing
+Company, Part, Manufacturer Part, Supplier Part and Package-parameter records.
+The JLCPCB C-code is stored as the Supplier Part SKU; the manufacturer number
+is stored as the Manufacturer Part MPN. The part-page description is used for
+new records and fills an empty existing Part description without replacing a
+non-empty one. The page's package value becomes a Part `Package` parameter.
+
+Each new Part requires a manually selected non-structural category or a newly
+entered category name, with an optional parent. New categories are created
+only when the user applies the reviewed import. The apply action requires an
+InvenTree superuser; preview requires staff access. No BOM lines or stock are
+changed by this catalogue workflow.
+
+If the configured JLCPCB Open API is available and provides manufacturer-specific
+description or website fields, the importer adds them to a new manufacturer or
+fills blank fields on an existing manufacturer. It never uses a component's
+description as a company description and never overwrites populated company
+fields. These fields remain blank when JLCPCB does not provide them.
+
 ## JLCPCB stock synchronization
 
 The plugin can mirror the three JLCPCB-owned inventory buckets into InvenTree

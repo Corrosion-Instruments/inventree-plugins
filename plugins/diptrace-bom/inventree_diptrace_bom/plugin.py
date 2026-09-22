@@ -22,6 +22,7 @@ from plugin.mixins import (
     UserInterfaceMixin,
 )
 
+from .catalogue import CatalogueError, CatalogueImportService
 from .jlcpcb import JlcApiError, JlcClient
 from .parser import BomParseError, parse_bom
 from .services import BomImportError, BomImportService
@@ -45,13 +46,16 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.3.14"
+    VERSION = "0.4.0"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
     NAVIGATION_TAB_NAME = "DipTrace BOM"
     NAVIGATION_TAB_ICON = "fas fa-list-check"
-    NAVIGATION = [{"name": "DipTrace BOM", "link": "plugin:diptrace-bom:index"}]
+    NAVIGATION = [
+        {"name": "DipTrace BOM", "link": "plugin:diptrace-bom:index"},
+        {"name": "JLC Part Catalogue", "link": "plugin:diptrace-bom:catalogue"},
+    ]
 
     SCHEDULED_TASKS = {
         "jlc-stock-sync": {
@@ -145,6 +149,78 @@ class DipTraceBomPlugin(
                 "initial_part": request.GET.get("part", ""),
             },
         )
+
+    def catalogue_index(self, request):
+        """Separate catalogue import screen; the BOM editor stays unchanged."""
+        if not request.user.is_authenticated or not request.user.is_staff:
+            return HttpResponseForbidden("Staff access required")
+        return render(request, "inventree_diptrace_bom/catalogue.html", {"csrf_token": get_token(request)})
+
+    def _catalogue_service(self):
+        credentials = BomImportService(self).jlc_credentials()
+        api_client = None
+        if credentials.configured:
+            api_client = JlcClient(
+                credentials,
+                host=str(self.get_setting("JLC_HOST")),
+                timeout=int(self.get_setting("JLC_TIMEOUT")),
+            )
+        return CatalogueImportService(
+            api_client=api_client,
+            supplier_id=BomImportService(self).setting("JLC_SUPPLIER", None),
+        )
+
+    def catalogue_preview(self, request):
+        if not request.user.is_authenticated or not request.user.is_staff:
+            return JsonResponse({"error": "Staff access required"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return JsonResponse({"error": "Select a CSV or XLSX BOM file"}, status=400)
+        if uploaded.size > 10 * 1024 * 1024:
+            return JsonResponse({"error": "BOM file exceeds 10 MB"}, status=400)
+        try:
+            rows = [row.as_dict() for row in parse_bom(uploaded, uploaded.name)]
+            result = self._catalogue_service().preview(rows)
+            result["preview_token"] = signing.dumps(
+                {"rows": rows, "user": request.user.pk},
+                salt="inventree-diptrace-catalogue-preview",
+                compress=True,
+            )
+            return JsonResponse(result)
+        except (BomParseError, CatalogueError) as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception:
+            logger.exception("Unexpected catalogue preview failure")
+            return JsonResponse({"error": "Catalogue preview failed; check the InvenTree server log"}, status=500)
+
+    def catalogue_apply(self, request):
+        if not request.user.is_authenticated or not request.user.is_superuser:
+            return JsonResponse({"error": "Superuser access required"}, status=403)
+        try:
+            data = json_request(request)
+            preview = signing.loads(
+                data.get("preview_token", ""),
+                salt="inventree-diptrace-catalogue-preview",
+                max_age=3600,
+            )
+            if preview.get("user") != request.user.pk:
+                return JsonResponse({"error": "Preview belongs to another user"}, status=403)
+            category_ids = data.get("categories") or {}
+            if not isinstance(category_ids, dict) or not isinstance(preview.get("rows"), list):
+                raise CatalogueError("Invalid catalogue preview data")
+            result = self._catalogue_service().apply(preview["rows"], category_ids, request.user)
+            return JsonResponse(result)
+        except signing.SignatureExpired:
+            return JsonResponse({"error": "Preview expired; upload the BOM again"}, status=400)
+        except signing.BadSignature:
+            return JsonResponse({"error": "Invalid preview token"}, status=400)
+        except (CatalogueError, BomImportError) as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception:
+            logger.exception("Unexpected catalogue apply failure")
+            return JsonResponse({"error": "Catalogue import failed; no records were saved"}, status=500)
 
     def preview(self, request):
         if not request.user.is_authenticated:
@@ -350,7 +426,7 @@ class DipTraceBomPlugin(
         still be able to reach the importer when a browser cannot load a
         plugin-provided dashboard script.
         """
-        return [
+        items = [
             {
                 "key": "diptrace-bom-navigation",
                 "title": _("DipTrace BOM"),
@@ -358,10 +434,21 @@ class DipTraceBomPlugin(
                 "options": {"url": f"/plugin/{self.SLUG}/"},
             }
         ]
+        if request.user.is_authenticated and request.user.is_staff:
+            items.append({
+                "key": "jlc-part-catalogue-navigation",
+                "title": _("JLC Part Catalogue"),
+                "icon": "ti:database-import",
+                "options": {"url": f"/plugin/{self.SLUG}/catalogue/"},
+            })
+        return items
 
     def setup_urls(self):
         return [
             path("", self.index, name="index"),
+            path("catalogue/", self.catalogue_index, name="catalogue"),
+            path("catalogue/preview/", self.catalogue_preview, name="catalogue-preview"),
+            path("catalogue/apply/", self.catalogue_apply, name="catalogue-apply"),
             path("test-connection/", self.test_connection, name="test-connection"),
             path("sync-stock/", self.sync_stock, name="sync-stock"),
             path("preview/", self.preview, name="preview"),

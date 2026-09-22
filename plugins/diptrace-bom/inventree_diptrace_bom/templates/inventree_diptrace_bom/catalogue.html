@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>JLC Part Catalogue Import</title>
+  <style>
+    :root { font-family: Arial, sans-serif; color: #172b49; background: #f5f7fb; }
+    body { margin: 0; padding: 28px; }
+    main { max-width: 1500px; margin: auto; }
+    h1 { margin: 0 0 8px; font-size: 27px; }
+    p { line-height: 1.5; }
+    .muted { color: #53657d; }
+    .card { background: white; border: 1px solid #dce4f0; border-radius: 10px; padding: 20px; margin: 18px 0; }
+    button, select, input { font: inherit; }
+    button { background: #2463dc; color: white; border: 0; padding: 9px 16px; border-radius: 5px; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    input[type=file] { padding: 8px; }
+    input[type=text], select { width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #b8c6d9; border-radius: 4px; }
+    label { font-weight: 600; }
+    .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 13px; }
+    th, td { text-align: left; padding: 9px; border-bottom: 1px solid #e4eaf3; vertical-align: top; }
+    th { background: #edf2fa; white-space: nowrap; }
+    .status { font-weight: 700; }
+    .blocked { color: #a72b2b; }
+    .ready { color: #12643b; }
+    .complete { color: #53657d; }
+    .category { min-width: 230px; display: grid; gap: 5px; }
+    .category small { color: #53657d; }
+    #message { white-space: pre-wrap; }
+    .error { color: #a72b2b; }
+    .success { color: #12643b; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>JLC Part Catalogue Import</h1>
+  <p class="muted">Upload a DipTrace CSV/XLSX file. Preview checks every JLCPCB C-code against the spreadsheet manufacturer number and existing InvenTree records. Mismatches are skipped. Nothing is saved until you apply the reviewed import.</p>
+  <section class="card">
+    <div class="toolbar">
+      <label for="file">BOM file</label>
+      <input id="file" type="file" accept=".csv,.xlsx,.xlsm,.txt">
+      <button id="preview" type="button">Preview catalogue import</button>
+    </div>
+  </section>
+  <section id="review" class="card" hidden>
+    <h2>Review</h2>
+    <p id="summary"></p>
+    <p class="muted">For each new Part, choose an existing non-structural category, or type a new category name and optionally choose its parent. Existing Parts keep their current category.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Designators</th><th>JLC code</th><th>Sheet Footprint / MPN</th><th>JLC MFR Part #</th><th>Manufacturer</th><th>Package</th><th>Decision</th><th>Category for new Part</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <p><button id="apply" type="button">Apply unblocked rows</button></p>
+    <p class="muted">Applying rechecks the JLC pages and InvenTree records. Rows lacking a category or failing validation stay skipped. Applying the same file again does not create duplicate catalogue records.</p>
+  </section>
+  <section id="message" class="card" role="status" aria-live="polite" hidden></section>
+</main>
+<script>
+(() => {
+  const file = document.getElementById('file');
+  const previewButton = document.getElementById('preview');
+  const applyButton = document.getElementById('apply');
+  const review = document.getElementById('review');
+  const rows = document.getElementById('rows');
+  const summary = document.getElementById('summary');
+  const message = document.getElementById('message');
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  let current = null;
+
+  function show(text, kind = '') {
+    message.hidden = false;
+    message.className = `card ${kind}`;
+    message.textContent = text;
+  }
+  async function responseJson(response) {
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    return body;
+  }
+  function option(value, label) {
+    const item = document.createElement('option'); item.value = value; item.textContent = label; return item;
+  }
+  function cell(tr, value) {
+    const td = document.createElement('td'); td.textContent = value || '—'; tr.appendChild(td); return td;
+  }
+  function categoryControls(tr, rowNumber) {
+    const td = document.createElement('td');
+    const wrap = document.createElement('div'); wrap.className = 'category'; wrap.dataset.row = rowNumber;
+    const existing = document.createElement('select'); existing.className = 'existing';
+    existing.setAttribute('aria-label', `Existing category for row ${rowNumber}`);
+    existing.appendChild(option('', 'Choose existing category'));
+    const parent = document.createElement('select'); parent.className = 'parent';
+    parent.setAttribute('aria-label', `Parent for new category on row ${rowNumber}`);
+    parent.appendChild(option('', 'New top-level category'));
+    for (const category of current.categories) {
+      const label = category.path || category.name;
+      if (!category.structural) existing.appendChild(option(category.pk, label));
+      parent.appendChild(option(category.pk, label));
+    }
+    const newName = document.createElement('input'); newName.type = 'text'; newName.maxLength = 100;
+    newName.className = 'new-name'; newName.placeholder = 'Or create category name';
+    newName.setAttribute('aria-label', `New category name for row ${rowNumber}`);
+    existing.addEventListener('change', () => { if (existing.value) newName.value = ''; });
+    newName.addEventListener('input', () => { if (newName.value.trim()) existing.value = ''; });
+    wrap.append(existing, newName, parent);
+    td.appendChild(wrap); tr.appendChild(td);
+  }
+  function render(data) {
+    current = data; rows.replaceChildren(); review.hidden = false;
+    summary.textContent = `${data.summary.total} rows · ${data.summary.ready} ready · ${data.summary.complete} already complete · ${data.summary.blocked} blocked`;
+    for (const item of data.rows) {
+      const tr = document.createElement('tr');
+      cell(tr, item.row.designators);
+      cell(tr, item.row.jlcpcb_part);
+      cell(tr, item.row.footprint);
+      cell(tr, item.product?.mpn);
+      cell(tr, item.product?.manufacturer);
+      cell(tr, item.product?.package);
+      const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
+      status.title = item.product?.description || '';
+      if (item.needs_category && item.status === 'ready') categoryControls(tr, item.row.row);
+      else cell(tr, item.part ? `Existing Part: ${item.part.name}` : '—');
+      rows.appendChild(tr);
+    }
+  }
+  previewButton.addEventListener('click', async () => {
+    if (!file.files.length) return show('Select a CSV or XLSX file first.', 'error');
+    previewButton.disabled = true; review.hidden = true; current = null;
+    show('Checking JLCPCB pages and InvenTree records…');
+    try {
+      const form = new FormData(); form.append('file', file.files[0]);
+      const data = await responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
+      render(data); show('Preview ready. Review the blocked rows and category choices before applying.', 'success');
+    } catch (error) { show(error.message, 'error'); }
+    finally { previewButton.disabled = false; }
+  });
+  applyButton.addEventListener('click', async () => {
+    if (!current) return;
+    if (!window.confirm('Apply only the unblocked catalogue rows to this InvenTree instance?')) return;
+    const categories = {};
+    for (const wrap of document.querySelectorAll('.category')) {
+      categories[wrap.dataset.row] = {
+        existing_id: wrap.querySelector('.existing').value,
+        new_name: wrap.querySelector('.new-name').value.trim(),
+        parent_id: wrap.querySelector('.parent').value,
+      };
+    }
+    applyButton.disabled = true; show('Rechecking source pages and saving catalogue records…');
+    try {
+      const data = await responseJson(await fetch('apply/', {
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify({preview_token: current.preview_token, categories}),
+      }));
+      const lines = [
+        `${data.created_parts} Parts, ${data.created_categories} categories, ${data.created_manufacturers} manufacturers and ${data.created_supplier} JLCPCB supplier created.`,
+        `${data.created_mpn} Manufacturer Parts, ${data.created_sku} Supplier Parts and ${data.created_package} Package parameters created.`,
+        `${data.existing} rows already complete; ${data.skipped.length} skipped.`,
+        ...data.skipped.map(item => `${item.code}: ${item.reason}`),
+      ];
+      show(lines.join('\n'), 'success');
+      if (!data.skipped.length) { current = null; review.hidden = true; }
+    } catch (error) { show(error.message, 'error'); }
+    finally { applyButton.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>
