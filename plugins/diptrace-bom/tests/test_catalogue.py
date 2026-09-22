@@ -18,6 +18,7 @@ from inventree_diptrace_bom.catalogue import (
     _select_apply_rows,
     _validate_manufacturer_choice,
     compare_row,
+    group_manufacturer_parts,
     parse_jlc_page,
     reviewed_sheet_mpn,
     validate_external_link,
@@ -152,6 +153,18 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("C106232", _conflicting_codes(rows))
         edited = apply_sheet_mpn_overrides(rows, {"2": "RC0402FR-07100RL"})
         self.assertNotIn("C106232", _conflicting_codes(edited))
+
+    def test_saved_manufacturer_parts_group_under_one_internal_part(self):
+        records = [
+            types.SimpleNamespace(part_id=1939, MPN="0402CG101J500NT",
+                                  manufacturer=types.SimpleNamespace(name="FH (Guangdong Fenghua Advanced Tech)")),
+            types.SimpleNamespace(part_id=1939, MPN="CC0402JRNPO9BN101",
+                                  manufacturer=types.SimpleNamespace(name="Yageo")),
+        ]
+        self.assertEqual(group_manufacturer_parts(records), {1939: [
+            {"mpn": "0402CG101J500NT", "manufacturer": "FH (Guangdong Fenghua Advanced Tech)"},
+            {"mpn": "CC0402JRNPO9BN101", "manufacturer": "Yageo"},
+        ]})
 
     def test_row_save_selects_one_line_and_rejects_full_file_conflicts(self):
         rows = [

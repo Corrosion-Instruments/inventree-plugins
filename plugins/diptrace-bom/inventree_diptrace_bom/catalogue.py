@@ -65,6 +65,17 @@ def apply_sheet_mpn_overrides(rows: list[dict], overrides: dict) -> list[dict]:
     return edited
 
 
+def group_manufacturer_parts(records) -> dict[int, list[dict]]:
+    """Expose only persisted MPN / maker associations on each internal Part."""
+    grouped: dict[int, list[dict]] = {}
+    for record in records:
+        grouped.setdefault(record.part_id, []).append({
+            "mpn": record.MPN,
+            "manufacturer": record.manufacturer.name,
+        })
+    return grouped
+
+
 def parse_jlc_page(html: str, code: str) -> JlcPart:
     """Extract the labelled product facts, failing closed if the page changes."""
     if not CODE_RE.fullmatch(code):
@@ -198,7 +209,7 @@ class CatalogueImportService:
                        url=f"https://jlcpcb.com/partdetail/{code}", source=source)
 
     def preview(self, rows: list[dict]) -> dict:
-        from company.models import Company
+        from company.models import Company, ManufacturerPart
         from part.models import PartCategory
 
         if not rows or len(rows) > MAX_ROWS:
@@ -210,6 +221,7 @@ class CatalogueImportService:
         for row in rows:
             code = str(row.get("jlcpcb_part") or "").upper()
             result = {"row": row, "status": "blocked", "reason": "", "product": None, "part": None,
+                      "manufacturer_parts": [],
                       "needs_category": False, "needs_sheet_manufacturer": False,
                       "needs_jlc_manufacturer": False}
             if code in duplicate_codes:
@@ -265,6 +277,17 @@ class CatalogueImportService:
              "parent_id": category.parent_id, "structural": category.structural}
             for category in PartCategory.objects.all().order_by("name")
         ]
+        part_ids = {item["part"]["pk"] for item in results if item["part"]}
+        saved_makers: dict[int, list[dict]] = {}
+        if part_ids:
+            saved_makers = group_manufacturer_parts(
+                ManufacturerPart.objects.filter(part_id__in=part_ids).select_related(
+                    "manufacturer"
+                ).order_by("manufacturer__name", "MPN", "pk")
+            )
+        for item in results:
+            if item["part"]:
+                item["manufacturer_parts"] = saved_makers.get(item["part"]["pk"], [])
         return {
             "rows": results,
             "categories": categories,

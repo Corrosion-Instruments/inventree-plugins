@@ -31,6 +31,9 @@
     .complete { color: #53657d; }
     .category, .manufacturer-choice { min-width: 230px; display: grid; gap: 5px; }
     .category small, .manufacturer-choice small { color: #53657d; }
+    .saved-makers { min-width: 220px; margin-top: 7px; }
+    .saved-makers ul { margin: 5px 0 0; padding-left: 17px; }
+    .saved-makers li { margin-bottom: 5px; overflow-wrap: anywhere; }
     .confirmation { display: flex; gap: 6px; align-items: flex-start; font-weight: normal; }
     .confirmation[hidden] { display: none; }
     .copy-line { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
@@ -70,7 +73,7 @@
     <p id="summary"></p>
     <p class="muted">For each new Part, choose or create a category. The editable spreadsheet MPN is checked separately from the original DipTrace Footprint. When MPNs differ, choose their manufacturer—even if it is the same as the JLC manufacturer—and confirm interchangeability. The JLCPCB link is saved automatically; an optional spreadsheet MPN link can be added. Unsaved edits stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Sheet MPN manufacturer / confirmation</th><th>Category for new Part</th><th>Action</th></tr></thead>
+      <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <p><button id="apply" type="button">Apply approved rows</button></p>
@@ -173,8 +176,25 @@
     wrap.append(existing, newName, parent);
     td.appendChild(wrap); tr.appendChild(td);
   }
+  function savedManufacturerParts(td, item) {
+    if (!item.manufacturer_parts?.length) return false;
+    const wrap = document.createElement('div'); wrap.className = 'saved-makers';
+    const heading = document.createElement('strong'); heading.textContent = 'Linked to this internal Part:';
+    const list = document.createElement('ul');
+    for (const record of item.manufacturer_parts) {
+      const entry = document.createElement('li');
+      entry.textContent = `${record.manufacturer} — ${record.mpn}`;
+      list.appendChild(entry);
+    }
+    wrap.append(heading, list); td.appendChild(wrap);
+    return true;
+  }
   function manufacturerControls(tr, item) {
-    if (item.status !== 'review') { cell(tr, '—'); return; }
+    if (item.status !== 'review') {
+      const td = document.createElement('td');
+      if (!savedManufacturerParts(td, item)) td.textContent = '—';
+      tr.appendChild(td); return;
+    }
     const rowNumber = item.row.row;
     const td = document.createElement('td');
     const wrap = document.createElement('div'); wrap.className = 'manufacturer-choice'; wrap.dataset.row = rowNumber;
@@ -220,7 +240,9 @@
       label.append(confirm, document.createTextNode(`Mark existing JLCPCB company “${item.product.manufacturer}” as a manufacturer.`));
       wrap.appendChild(label);
     }
-    td.appendChild(wrap); tr.appendChild(td);
+    td.appendChild(wrap);
+    savedManufacturerParts(td, item);
+    tr.appendChild(td);
   }
   function choicesFor(tr) {
     const category = tr.querySelector('.category');
@@ -337,7 +359,7 @@
       status.title = item.product?.description || '';
       manufacturerControls(tr, item);
       if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item.row.row);
-      else cell(tr, item.part ? `Existing Part: ${item.part.name}` : '—');
+      else cell(tr, item.part ? `Internal Part: ${item.part.name}` : '—');
       const action = document.createElement('td'); action.className = 'row-action';
       if (item.status === 'ready' || item.status === 'review') {
         const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Save this item';

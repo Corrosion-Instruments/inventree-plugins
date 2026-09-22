@@ -46,6 +46,10 @@ The importer then adds both Manufacturer Part records to one internal Part;
 the JLCPCB C-code Supplier Part links to the JLCPCB Manufacturer Part. It does
 not infer the spreadsheet manufacturer's name from JLCPCB. Missing source data,
 duplicate identifiers, and conflicting existing InvenTree links remain blocked.
+The review table labels the internal Part separately and lists every saved
+Manufacturer Part linked to it, showing each manufacturer name and MPN after
+a save and on later previews. This list reflects InvenTree records, not proposed
+unsaved matches.
 The JLCPCB Manufacturer Part gets the known JLCPCB page URL automatically. For
 a mismatched spreadsheet MPN, the preview offers one optional URL field; its
 value is saved on that separate Manufacturer Part. An existing blank link may

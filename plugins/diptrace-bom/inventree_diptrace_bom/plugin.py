@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.5.8"
+    VERSION = "0.5.9"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
