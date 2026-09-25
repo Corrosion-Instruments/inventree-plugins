@@ -1,0 +1,17 @@
+<header class="site-header">
+  <nav class="nav-shell" aria-label="Primary navigation">
+    <a class="brand" href="/web/" aria-label="InvenTree Dashboard">
+      <span class="brand-mark" aria-hidden="true">IT</span>
+      <span>InvenTree</span>
+    </a>
+    <div class="nav-links">
+      <a href="/plugin/diptrace-bom/"{% if active_page == "import" %} class="active" aria-current="page"{% endif %}>BOM Importer</a>
+      {% if show_catalogue_nav %}<a href="/plugin/diptrace-bom/catalogue/"{% if active_page == "catalogue" %} class="active" aria-current="page"{% endif %}>Part Catalogue</a>{% endif %}
+      <span class="nav-divider" aria-hidden="true"></span>
+      <a href="/web/part/">Parts</a>
+      <a href="/web/stock/">Stock</a>
+      <a href="/web/manufacturing/">Manufacturing</a>
+      <a href="/web/settings/plugins/">Plugin Settings</a>
+    </div>
+  </nav>
+</header>

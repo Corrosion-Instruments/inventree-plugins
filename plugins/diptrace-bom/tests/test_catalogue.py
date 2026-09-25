@@ -274,6 +274,24 @@ class CatalogueTests(unittest.TestCase):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
         self.assertIn(".confirmation[hidden] { display: none; }", page.read_text(encoding="utf-8"))
 
+    def test_importers_share_header_navigation_and_design_tokens(self):
+        templates = (Path(__file__).resolve().parents[1]
+                     / "inventree_diptrace_bom/templates/inventree_diptrace_bom")
+        header = (templates / "_header.html").read_text(encoding="utf-8")
+        catalogue = (templates / "catalogue.html").read_text(encoding="utf-8")
+        importer = (templates / "import.html").read_text(encoding="utf-8")
+        self.assertIn('/plugin/diptrace-bom/"', header)
+        self.assertIn('/plugin/diptrace-bom/catalogue/"', header)
+        self.assertEqual(header.count('aria-current="page"'), 2)
+        include = '{% include "inventree_diptrace_bom/_header.html" %}'
+        self.assertIn(include, importer)
+        self.assertIn(include, catalogue)
+        for token in ("--ink:#182230", "--canvas:#f6f7f9", "--action:#171717"):
+            self.assertIn(token, importer)
+            self.assertIn(token, catalogue)
+        self.assertIn('class="file-control"', catalogue)
+        self.assertIn('class="table-wrap"', catalogue)
+
     def test_optional_sheet_part_link_accepts_only_web_urls(self):
         self.assertEqual(validate_external_link(None), "")
         self.assertEqual(validate_external_link(" https://example.com/part/123 "), "https://example.com/part/123")

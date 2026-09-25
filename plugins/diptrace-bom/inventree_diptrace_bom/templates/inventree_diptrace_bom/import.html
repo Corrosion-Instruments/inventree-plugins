@@ -64,6 +64,8 @@
     .nav-links { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
     .nav-links a { border-radius:6px; padding:8px 10px; color:#475467; font-size:14px; font-weight:500; }
     .nav-links a:hover { background:var(--band); color:var(--ink); text-decoration:none; }
+    .nav-links a.active { background:var(--action-soft); color:var(--ink); font-weight:600; }
+    .nav-divider { width:1px; height:22px; margin:0 4px; background:var(--line-soft); }
     .page-shell { padding:28px 0 48px; }
     .page-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
     h1,h2,h3 { text-wrap:balance; }
@@ -268,6 +270,7 @@
       .nav-shell { display:block; }
       .nav-links { margin-top:10px; justify-content:flex-start; gap:2px; }
       .nav-links a { padding:7px 8px; }
+      .nav-divider { display:none; }
       .page-shell { padding-top:20px; }
       .section-body { padding:16px; }
       .row { grid-template-columns:1fr; }
@@ -292,20 +295,7 @@
 </head>
 <body data-initial-part="{{ initial_part }}">
   <a class="skip-link" href="#main-content">Skip to Main Content</a>
-  <header class="site-header">
-    <nav class="nav-shell" aria-label="Primary navigation">
-      <a class="brand" href="/web/" aria-label="InvenTree Dashboard">
-        <span class="brand-mark" aria-hidden="true">IT</span>
-        <span>InvenTree</span>
-      </a>
-      <div class="nav-links">
-        <a href="/web/part/">Parts</a>
-        <a href="/web/stock/">Stock</a>
-        <a href="/web/manufacturing/">Manufacturing</a>
-        <a href="/web/settings/plugins/">Plugin Settings</a>
-      </div>
-    </nav>
-  </header>
+  {% include "inventree_diptrace_bom/_header.html" %}
 
   <div class="page-shell">
     <div class="page-heading">

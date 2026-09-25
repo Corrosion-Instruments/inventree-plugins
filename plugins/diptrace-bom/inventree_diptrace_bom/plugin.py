@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.6.0"
+    VERSION = "0.6.1"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -147,6 +147,8 @@ class DipTraceBomPlugin(
                 "title": self.TITLE,
                 "csrf_token": get_token(request),
                 "initial_part": request.GET.get("part", ""),
+                "active_page": "import",
+                "show_catalogue_nav": request.user.is_staff,
             },
         )
 
@@ -154,7 +156,11 @@ class DipTraceBomPlugin(
         """Separate catalogue import screen; the BOM editor stays unchanged."""
         if not request.user.is_authenticated or not request.user.is_staff:
             return HttpResponseForbidden("Staff access required")
-        return render(request, "inventree_diptrace_bom/catalogue.html", {"csrf_token": get_token(request)})
+        return render(request, "inventree_diptrace_bom/catalogue.html", {
+            "csrf_token": get_token(request),
+            "active_page": "catalogue",
+            "show_catalogue_nav": True,
+        })
 
     def _catalogue_service(self):
         credentials = BomImportService(self).jlc_credentials()

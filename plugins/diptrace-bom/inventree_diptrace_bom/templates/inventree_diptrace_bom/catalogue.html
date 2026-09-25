@@ -5,32 +5,90 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>JLC Part Catalogue Import</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
   <style>
-    :root { font-family: Arial, sans-serif; color: #172b49; background: #f5f7fb; }
-    body { margin: 0; padding: 28px; }
-    main { max-width: 1500px; margin: auto; }
-    h1 { margin: 0 0 8px; font-size: 27px; }
-    p { line-height: 1.5; }
-    .muted { color: #53657d; }
-    .card { background: white; border: 1px solid #dce4f0; border-radius: 10px; padding: 20px; margin: 18px 0; }
-    button, select, input { font: inherit; }
-    button { background: #2463dc; color: white; border: 0; padding: 9px 16px; border-radius: 5px; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: wait; }
-    input[type=file] { padding: 8px; }
-    input[type=text], input[type=url], select { width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #b8c6d9; border-radius: 4px; }
-    label { font-weight: 600; }
-    .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .table-wrap { overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 13px; }
-    th, td { text-align: left; padding: 9px; border-bottom: 1px solid #e4eaf3; vertical-align: top; }
-    th { background: #edf2fa; white-space: nowrap; }
-    .status { font-weight: 700; }
-    .blocked { color: #a72b2b; }
-    .ready { color: #12643b; }
-    .review { color: #8a5200; }
-    .complete { color: #53657d; }
+    :root {
+      color-scheme:light;
+      --ink:#182230; --muted:#667085; --subtle:#98a2b3;
+      --line:#d0d5dd; --line-soft:#e4e7ec; --surface:#fff;
+      --canvas:#f6f7f9; --band:#f9fafb; --action:#171717;
+      --action-hover:#000; --action-soft:#f2f2f2;
+      --ok:#067647; --ok-soft:#ecfdf3; --warn:#b54708;
+      --warn-soft:#fff7ed; --danger:#b42318; --danger-soft:#fef3f2;
+      --shadow:0 1px 2px rgba(16,24,40,.05);
+    }
+    * { box-sizing:border-box; }
+    html { background:var(--canvas); scroll-behavior:smooth; }
+    body { margin:0; min-width:320px; font-family:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--canvas); }
+    a { color:var(--action); text-decoration:none; }
+    a:hover { color:var(--action-hover); text-decoration:underline; text-underline-offset:3px; }
+    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
+    button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
+    button { min-height:36px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid var(--action); border-radius:6px; padding:0 12px; background:var(--action); color:#fff; font-size:13px; font-weight:500; line-height:1; white-space:nowrap; cursor:pointer; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
+    button:hover:not(:disabled) { border-color:var(--action-hover); background:var(--action-hover); }
+    button:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(16,24,40,.24); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    input[type=text],input[type=url],select { min-height:36px; width:100%; border:1px solid var(--line); border-radius:6px; padding:0 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    input:hover,select:hover { border-color:#98a2b3; }
+    input::placeholder { color:var(--subtle); }
+    input[type=checkbox] { width:16px; min-height:16px; height:16px; margin:1px 0 0; box-shadow:none; }
+    label { color:#344054; font-size:13px; font-weight:600; }
+    .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
+    .skip-link:focus { transform:translateY(0); }
+    .site-header { border-bottom:1px solid var(--line-soft); background:var(--surface); }
+    .nav-shell,.page-shell { width:min(1520px,calc(100% - 40px)); margin:0 auto; }
+    .nav-shell { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; color:#101828; font-size:16px; font-weight:700; }
+    .brand:hover { color:var(--action); text-decoration:none; }
+    .brand-mark { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action); color:#fff; font-size:13px; letter-spacing:-.04em; }
+    .nav-links { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+    .nav-links a { border-radius:6px; padding:8px 10px; color:#475467; font-size:14px; font-weight:500; }
+    .nav-links a:hover { background:var(--band); color:var(--ink); text-decoration:none; }
+    .nav-links a.active { background:var(--action-soft); color:var(--ink); font-weight:600; }
+    .nav-divider { width:1px; height:22px; margin:0 4px; background:var(--line-soft); }
+    .page-shell { padding:28px 0 48px; }
+    .page-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
+    h1,h2 { text-wrap:balance; }
+    h1 { margin:0; font-size:clamp(26px,3vw,34px); font-weight:500; line-height:1.18; letter-spacing:-.025em; }
+    h2 { margin:0; font-size:18px; font-weight:600; letter-spacing:-.01em; }
+    p { line-height:1.5; }
+    .page-intro { max-width:850px; margin:8px 0 0; color:var(--muted); font-size:14px; }
+    .workflow-note { min-height:36px; display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:var(--surface); color:#344054; font-size:13px; font-weight:500; box-shadow:var(--shadow); }
+    main { min-width:0; display:grid; gap:18px; }
+    .card { min-width:0; position:relative; border:1px solid var(--line-soft); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); }
+    .section-body { min-width:0; padding:20px; }
+    .muted { color:var(--muted); }
+    .upload-layout { width:min(900px,100%); display:grid; grid-template-columns:minmax(320px,1fr) auto; align-items:end; gap:16px; }
+    .field { display:grid; gap:7px; }
+    .field-help { color:var(--muted); font-size:12px; line-height:1.45; }
+    .file-control { min-width:0; min-height:36px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; overflow:hidden; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:var(--shadow); }
+    .file-control:hover { border-color:#98a2b3; }
+    .file-control:focus-within { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
+    .file-trigger { min-height:34px; display:inline-flex; align-items:center; border-right:1px solid var(--line); padding:0 12px; background:var(--band); color:#344054; font-size:13px; font-weight:500; cursor:pointer; }
+    .file-trigger:hover { background:var(--action-soft); color:var(--ink); }
+    .file-name { min-width:0; overflow:hidden; padding:0 11px; color:var(--muted); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+    .visually-hidden { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
+    .review-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:10px; }
+    #summary { margin:0; border-radius:999px; padding:5px 10px; background:var(--action-soft); color:#475467; font-size:12px; font-weight:600; }
+    .review-copy { max-width:1180px; margin:0 0 16px; font-size:13px; }
+    .table-wrap { max-width:100%; max-height:min(70vh,800px); overflow:auto; border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
+    table { width:100%; min-width:1900px; table-layout:auto; border-collapse:separate; border-spacing:0; font-size:13px; }
+    th,td { border-bottom:1px solid #e3e6eb; border-right:1px solid #e8eaee; padding:11px 10px; color:#253044; line-height:1.4; text-align:left; vertical-align:top; }
+    th:last-child,td:last-child { border-right:0; }
+    tbody tr:last-child td { border-bottom:0; }
+    tbody tr:nth-child(odd) td { background:#fff; }
+    tbody tr:nth-child(even) td { background:#f7f8fa; }
+    tbody tr:hover td { background:#eef3f8; }
+    th { position:sticky; top:0; z-index:2; border-bottom-color:#cfd4dc; padding-top:14px; padding-bottom:14px; background:#eef0f3; color:#344054; font-size:12px; font-weight:600; line-height:1.2; white-space:nowrap; box-shadow:inset 0 -1px 0 rgba(16,24,40,.04); }
+    .status { min-width:220px; font-weight:600; }
+    .status.blocked { color:var(--danger); background:var(--danger-soft); }
+    .status.ready { color:var(--ok); background:var(--ok-soft); }
+    .status.review { color:var(--warn); background:var(--warn-soft); }
+    .status.complete { color:#475467; background:#f2f4f7; }
     .category, .manufacturer-choice { min-width: 230px; display: grid; gap: 5px; }
-    .category small, .manufacturer-choice small { color: #53657d; }
+    .category small, .manufacturer-choice small { color:var(--muted); }
     .saved-makers { min-width: 220px; margin-top: 7px; }
     .saved-makers ul { margin: 5px 0 0; padding-left: 17px; }
     .saved-makers li { margin-bottom: 5px; overflow-wrap: anywhere; }
@@ -38,55 +96,104 @@
     .confirmation[hidden] { display: none; }
     .copy-line { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
     .copy-line span { overflow-wrap: anywhere; }
-    .copy-button { flex: 0 0 auto; padding: 2px; color: #2463dc; background: transparent; border: 1px solid transparent; }
-    .copy-button:hover, .copy-button:focus-visible { background: #edf2fa; border-color: #b8c6d9; }
-    .copy-feedback { color: #12643b; font-size: 12px; }
+    button.copy-button { flex:0 0 auto; width:28px; min-height:28px; padding:0; color:var(--muted); background:transparent; border-color:transparent; }
+    button.copy-button:hover,button.copy-button:focus-visible { background:var(--surface); border-color:var(--line-soft); color:var(--ink); }
+    .copy-feedback { color:var(--ok); font-size:12px; }
     .external-link-field { display: grid; gap: 3px; margin-top: 7px; min-width: 180px; }
-    .external-link-field label { color: #53657d; font-size: 12px; }
+    .external-link-field label { color:var(--muted); font-size:12px; }
     .sheet-mpn-field { display: grid; gap: 4px; margin-top: 8px; min-width: 205px; }
-    .sheet-mpn-field label { color: #53657d; font-size: 12px; }
-    .sheet-mpn-field button { justify-self: start; padding: 5px 9px; }
+    .sheet-mpn-field label { color:var(--muted); font-size:12px; }
+    .sheet-mpn-field button,.source-choice button { min-height:30px; justify-self:start; padding:0 9px; }
     .source-choice { min-width: 200px; display: grid; gap: 5px; }
-    .source-choice small { color: #53657d; }
-    .source-choice button { justify-self: start; padding: 5px 9px; }
-    .unchecked-note { color: #8a5200; font-size: 12px; }
-    .source-link { display: inline-block; margin-top: 4px; }
-    .source-note { display: block; margin-top: 4px; color: #53657d; font-size: 11px; }
+    .source-choice small { color:var(--muted); }
+    .unchecked-note { color:var(--warn); font-size:12px; }
+    .source-link { display:inline-block; margin-top:4px; font-weight:500; text-decoration:underline; text-underline-offset:3px; }
+    .source-note { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+    .review-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:16px; }
+    .review-actions p { margin:0; font-size:12px; }
     #message { white-space: pre-wrap; }
-    .error { color: #a72b2b; }
-    .success { color: #12643b; }
+    #message.error { border-left:3px solid var(--danger); color:var(--danger); }
+    #message.success { border-left:3px solid var(--ok); color:var(--ok); }
     .row-action { min-width: 115px; }
     .row-action small { display: block; margin-top: 6px; overflow-wrap: anywhere; }
     .row-action button { white-space: nowrap; }
+    @media(max-width:900px) {
+      .nav-shell,.page-shell { width:min(100% - 24px,1520px); }
+      .page-heading { display:block; }
+      .workflow-note { margin-top:14px; }
+      .nav-shell { align-items:flex-start; padding:14px 0; }
+      .nav-links { justify-content:flex-end; }
+      .upload-layout { grid-template-columns:1fr; }
+      .upload-layout button { justify-self:start; }
+      .review-header,.review-actions { align-items:flex-start; flex-direction:column; }
+    }
+    @media(max-width:600px) {
+      .nav-shell { display:block; }
+      .nav-links { margin-top:10px; justify-content:flex-start; gap:2px; }
+      .nav-links a { padding:7px 8px; }
+      .nav-divider { display:none; }
+      .page-shell { padding-top:20px; }
+      .section-body { padding:16px; }
+      .upload-layout button { width:100%; }
+    }
+    @media(prefers-reduced-motion:reduce) {
+      html { scroll-behavior:auto; }
+      *,*::before,*::after { transition-duration:.01ms !important; }
+    }
   </style>
 </head>
 <body>
-<main>
-  <h1>JLC Part Catalogue Import</h1>
-  <p class="muted">Upload a DipTrace CSV/XLSX file. JLCPCB's private-library API supplies current consigned quantities. Positive consigned stock triggers spreadsheet-MPN review; zero stock is not proof of an ordinary catalogue part. Edit CAD-prefixed MPNs and check again before saving.</p>
-  <section class="card">
-    <div class="toolbar">
-      <label for="file">BOM file</label>
-      <input id="file" type="file" accept=".csv,.xlsx,.xlsm,.txt">
-      <button id="preview" type="button">Preview catalogue import</button>
+<a class="skip-link" href="#main-content">Skip to Main Content</a>
+{% include "inventree_diptrace_bom/_header.html" %}
+<div class="page-shell">
+  <div class="page-heading">
+    <div>
+      <h1>JLC Part Catalogue Import</h1>
+      <p class="page-intro">Create and reconcile InvenTree catalogue records from a DipTrace BOM, using current JLCPCB component and consignment data.</p>
     </div>
-  </section>
-  <section id="review" class="card" hidden>
-    <h2>Review</h2>
-    <p id="summary"></p>
-    <p class="muted">For each new Part, choose or create a category. The original DipTrace Footprint stays visible. Positive JLC consigned stock requires a spreadsheet-MPN comparison; when the consigned balance is zero and MPNs differ, choose ordinary JLC catalogue or consigned and recheck. Only consigned mismatches need a second manufacturer and interchangeability confirmation. The JLCPCB link is saved automatically; an optional spreadsheet MPN link can be added. Unsaved edits stay in this browser for this file; reselect and preview the same file after a refresh to restore them.</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Consigned source</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table></div>
-    <p><button id="apply" type="button">Apply approved rows</button></p>
-    <p class="muted">Each save rechecks that item and refreshes the review, including newly created manufacturers and categories. Unapproved mismatches, missing categories and conflicting records stay skipped. Reimporting the same file does not create duplicate catalogue records.</p>
-  </section>
-  <section id="message" class="card" role="status" aria-live="polite" hidden></section>
-</main>
+    <span class="workflow-note">Review before import</span>
+  </div>
+  <main id="main-content" tabindex="-1">
+    <section class="card" aria-label="Catalogue import setup">
+      <div class="section-body">
+        <div class="upload-layout">
+          <div class="field">
+            <label for="file">DipTrace BOM File</label>
+            <div class="file-control">
+              <label class="file-trigger" for="file">Choose File</label>
+              <span id="file-name" class="file-name">CSV, XLSX, XLSM, or TXT</span>
+              <input id="file" class="visually-hidden" type="file" accept=".csv,.xlsx,.xlsm,.txt">
+            </div>
+            <span class="field-help">The preview is read-only. Nothing is saved until you approve a row.</span>
+          </div>
+          <button id="preview" type="button">Preview Catalogue Import</button>
+        </div>
+      </div>
+    </section>
+    <section id="review" class="card" hidden>
+      <div class="section-body">
+        <div class="review-header">
+          <h2>Review catalogue records</h2>
+          <p id="summary"></p>
+        </div>
+        <p class="muted review-copy">For each new Part, choose or create a category. Positive JLC consigned stock requires a spreadsheet-MPN comparison; when the consigned balance is zero and MPNs differ, choose ordinary JLC catalogue or consigned and recheck. Only consigned mismatches need a second manufacturer and interchangeability confirmation.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Consigned source</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+        <div class="review-actions">
+          <button id="apply" type="button">Apply Approved Rows</button>
+          <p class="muted">Each save rechecks the row and refreshes categories and manufacturers. Reimporting the same file does not create duplicates.</p>
+        </div>
+      </div>
+    </section>
+    <section id="message" class="card section-body" role="status" aria-live="polite" hidden></section>
+  </main>
+</div>
 <script>
 (() => {
   const file = document.getElementById('file');
+  const fileName = document.getElementById('file-name');
   const previewButton = document.getElementById('preview');
   const applyButton = document.getElementById('apply');
   const review = document.getElementById('review');
@@ -98,9 +205,13 @@
   let draftKey = null;
   let busy = false;
 
+  file.addEventListener('change', () => {
+    fileName.textContent = file.files[0]?.name || 'CSV, XLSX, XLSM, or TXT';
+  });
+
   function show(text, kind = '') {
     message.hidden = false;
-    message.className = `card ${kind}`;
+    message.className = `card section-body ${kind}`;
     message.textContent = text;
   }
   async function responseJson(response) {
