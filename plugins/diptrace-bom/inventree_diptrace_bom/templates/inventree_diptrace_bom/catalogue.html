@@ -60,7 +60,9 @@
     .card { min-width:0; position:relative; border:1px solid var(--line-soft); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); }
     .section-body { min-width:0; padding:20px; }
     .muted { color:var(--muted); }
-    .upload-layout { width:min(900px,100%); display:grid; grid-template-columns:minmax(320px,1fr) auto; align-items:end; gap:16px; }
+    .upload-layout { width:min(900px,100%); }
+    .upload-row { display:grid; grid-template-columns:minmax(320px,1fr) auto; align-items:stretch; gap:16px; }
+    .upload-row button { min-height:36px; }
     .field { display:grid; gap:7px; }
     .field-help { color:var(--muted); font-size:12px; line-height:1.45; }
     .file-control { min-width:0; min-height:36px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; overflow:hidden; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:var(--shadow); }
@@ -123,8 +125,8 @@
       .workflow-note { margin-top:14px; }
       .nav-shell { align-items:flex-start; padding:14px 0; }
       .nav-links { justify-content:flex-end; }
-      .upload-layout { grid-template-columns:1fr; }
-      .upload-layout button { justify-self:start; }
+      .upload-row { grid-template-columns:1fr; }
+      .upload-row button { justify-self:start; }
       .review-header,.review-actions { align-items:flex-start; flex-direction:column; }
     }
     @media(max-width:600px) {
@@ -134,7 +136,7 @@
       .nav-divider { display:none; }
       .page-shell { padding-top:20px; }
       .section-body { padding:16px; }
-      .upload-layout button { width:100%; }
+      .upload-row button { width:100%; }
     }
     @media(prefers-reduced-motion:reduce) {
       html { scroll-behavior:auto; }
@@ -159,14 +161,16 @@
         <div class="upload-layout">
           <div class="field">
             <label for="file">DipTrace BOM File</label>
-            <div class="file-control">
-              <label class="file-trigger" for="file">Choose File</label>
-              <span id="file-name" class="file-name">CSV, XLSX, XLSM, or TXT</span>
-              <input id="file" class="visually-hidden" type="file" accept=".csv,.xlsx,.xlsm,.txt">
+            <div class="upload-row">
+              <div class="file-control">
+                <label class="file-trigger" for="file">Choose File</label>
+                <span id="file-name" class="file-name">CSV, XLSX, XLSM, or TXT</span>
+                <input id="file" class="visually-hidden" type="file" accept=".csv,.xlsx,.xlsm,.txt">
+              </div>
+              <button id="preview" type="button">Preview Catalogue Import</button>
             </div>
             <span class="field-help">The preview is read-only. Nothing is saved until you approve a row.</span>
           </div>
-          <button id="preview" type="button">Preview Catalogue Import</button>
         </div>
       </div>
     </section>
