@@ -113,6 +113,9 @@
     .unchecked-note { color:var(--warn); font-size:12px; }
     .source-link { display:inline-block; margin-top:4px; font-weight:500; text-decoration:underline; text-underline-offset:3px; }
     .source-note { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+    .package-resolution { min-width:240px; display:grid; gap:5px; margin-top:7px; }
+    .package-resolution small { color:var(--muted); }
+    .package-resolution .custom-package[hidden] { display:none; }
     .review-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:16px; }
     .review-actions p { margin:0; font-size:12px; }
     .toast-region { position:fixed; top:max(16px,env(safe-area-inset-top)); right:max(16px,env(safe-area-inset-right)); z-index:120; width:min(420px,calc(100% - 32px)); display:grid; gap:10px; pointer-events:none; }
@@ -409,9 +412,43 @@
     }
     tr.appendChild(td);
   }
+  function packageControls(tr, item) {
+    const td = document.createElement('td');
+    const value = document.createElement('div'); value.textContent = item.product?.package || '—';
+    td.appendChild(value);
+    if (item.needs_package_resolution) {
+      const wrap = document.createElement('div'); wrap.className = 'package-resolution';
+      const existing = document.createElement('small');
+      existing.textContent = `Existing Package: ${item.existing_package || 'blank'}`;
+      const select = document.createElement('select'); select.className = 'package-action';
+      select.setAttribute('aria-label', `Package resolution for row ${item.row.row}`);
+      select.append(option('', 'Resolve Package difference'),
+        option('keep_existing', 'Same package — keep existing'),
+        option('use_jlc', 'Use JLC package'),
+        option('custom', 'Enter canonical package'),
+        option('different', 'Different physical package — keep blocked'));
+      const custom = document.createElement('input'); custom.type = 'text'; custom.maxLength = 100;
+      custom.className = 'custom-package'; custom.placeholder = 'Canonical package value'; custom.hidden = true;
+      custom.setAttribute('aria-label', `Canonical Package value for row ${item.row.row}`);
+      const hint = document.createElement('small'); hint.className = 'package-hint';
+      const update = () => {
+        custom.hidden = select.value !== 'custom';
+        hint.textContent = select.value === 'keep_existing'
+          ? `Keep ${item.existing_package} as Package and record ${item.product.package} as JLC Package.`
+          : select.value === 'use_jlc' ? `Replace Package with ${item.product.package}.`
+          : select.value === 'custom' ? 'Use your value as Package and retain the JLC value separately.'
+          : select.value === 'different' ? 'This row will remain blocked for identity review.'
+          : 'Choose how these package names relate.';
+      };
+      select.addEventListener('change', update); update();
+      wrap.append(existing, select, custom, hint); td.appendChild(wrap);
+    }
+    tr.appendChild(td);
+  }
   function choicesFor(tr) {
     const category = tr.querySelector('.category');
     const manufacturer = tr.querySelector('.manufacturer-choice');
+    const packageResolution = tr.querySelector('.package-resolution');
     return {
       sheet_mpn: tr.querySelector('.sheet-mpn')?.value.trim() ?? '',
       category: category ? {
@@ -424,6 +461,10 @@
         confirm: manufacturer.querySelector('.confirm-equivalent')?.checked || false,
         mark_sheet_manufacturer: manufacturer.querySelector('.mark-sheet-manufacturer')?.checked || false,
         mark_jlc_manufacturer: manufacturer.querySelector('.mark-jlc-manufacturer')?.checked || false,
+      } : null,
+      package: packageResolution ? {
+        action: packageResolution.querySelector('.package-action').value,
+        custom_value: packageResolution.querySelector('.custom-package').value.trim(),
       } : null,
       sheet_link: tr.querySelector('.sheet-link')?.value.trim() || '',
     };
@@ -479,6 +520,15 @@
       const markJlc = manufacturer.querySelector('.mark-jlc-manufacturer');
       if (markJlc) markJlc.checked = Boolean(saved.mark_jlc_manufacturer);
     }
+    const packageResolution = tr.querySelector('.package-resolution');
+    if (packageResolution && choice.package) {
+      const action = packageResolution.querySelector('.package-action');
+      if ([...action.options].some(option => option.value === choice.package.action)) {
+        action.value = choice.package.action || '';
+      }
+      packageResolution.querySelector('.custom-package').value = choice.package.custom_value || '';
+      action.dispatchEvent(new Event('change'));
+    }
     const link = tr.querySelector('.sheet-link');
     if (link) link.value = choice.sheet_link || '';
   }
@@ -519,7 +569,7 @@
           item.product.source === 'api+page' ? 'JLC API; missing fields from page' : 'JLC page fallback';
         makerCell.appendChild(note);
       }
-      cell(tr, item.product?.package);
+      packageControls(tr, item);
       sourceControls(tr, item);
       const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
       status.title = item.product?.description || '';
@@ -545,21 +595,27 @@
       pending ||= changed;
       tr.querySelector('.unchecked-note').hidden = tr.querySelector('.sheet-mpn').value.trim() === tr.dataset.reviewedMpn;
       const save = tr.querySelector('.save-item');
-      if (save) save.disabled = busy || changed;
+      const packageResolution = tr.querySelector('.package-resolution');
+      const packageAction = packageResolution?.querySelector('.package-action').value || '';
+      const customPackage = packageResolution?.querySelector('.custom-package').value.trim() || '';
+      const packageReady = !packageResolution
+        || Boolean(packageAction && packageAction !== 'different' && (packageAction !== 'custom' || customPackage));
+      if (save) save.disabled = busy || changed || !packageReady;
     }
     applyButton.disabled = busy || pending;
     return pending;
   }
   function collectPayload(rowNumber = null) {
-    const categories = {}, manufacturers = {}, sheet_links = {};
+    const categories = {}, manufacturers = {}, packages = {}, sheet_links = {};
     for (const tr of rows.querySelectorAll('tr[data-row]')) {
       if (tr.dataset.saved === 'true' || (rowNumber !== null && tr.dataset.row !== String(rowNumber))) continue;
       const choice = choicesFor(tr);
       if (choice.category) categories[tr.dataset.row] = choice.category;
       if (choice.manufacturer) manufacturers[tr.dataset.row] = choice.manufacturer;
+      if (choice.package) packages[tr.dataset.row] = choice.package;
       if (tr.querySelector('.sheet-link')) sheet_links[tr.dataset.row] = choice.sheet_link;
     }
-    return {preview_token: current.preview_token, categories, manufacturers, sheet_links,
+    return {preview_token: current.preview_token, categories, manufacturers, packages, sheet_links,
       ...(rowNumber === null ? {} : {row_number: Number(rowNumber)})};
   }
   async function fileKey(selected) {

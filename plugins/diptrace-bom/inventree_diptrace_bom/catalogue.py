@@ -152,6 +152,34 @@ def consignment_source(quantity: str, chosen_source: str | None = None) -> str:
     return "catalogue"
 
 
+def package_needs_resolution(existing_package: str, recorded_jlc_package: str,
+                             current_jlc_package: str) -> bool:
+    """Require review only when neither saved package value matches JLC."""
+    existing = normalize_identifier(existing_package)
+    recorded = normalize_identifier(recorded_jlc_package)
+    current = normalize_identifier(current_jlc_package)
+    return bool(existing and current and existing != current and recorded != current)
+
+
+def validate_package_choice(choice: dict, existing_package: str) -> tuple[str, str]:
+    """Validate a manual resolution for differing internal and JLC package names."""
+    if not isinstance(choice, dict):
+        raise CatalogueError("Choose how to resolve the Package difference")
+    action = str(choice.get("action") or "")
+    if action not in {"keep_existing", "use_jlc", "custom", "different"}:
+        raise CatalogueError("Choose how to resolve the Package difference")
+    if action == "different":
+        raise CatalogueError("This is a different physical package; resolve the Part identity manually")
+    if action == "keep_existing" and not str(existing_package or "").strip():
+        raise CatalogueError("The existing Package is blank; choose the JLC value or enter a custom value")
+    custom = " ".join(str(choice.get("custom_value") or "").split())
+    if action == "custom" and not custom:
+        raise CatalogueError("Enter the canonical Package value")
+    if len(custom) > 100:
+        raise CatalogueError("The canonical Package value exceeds 100 characters")
+    return action, custom
+
+
 class CatalogueImportService:
     """Plan and apply idempotent InvenTree catalogue records."""
 
@@ -289,9 +317,9 @@ class CatalogueImportService:
                         result.update(self._plan_product(product))
                         needs_sheet = bool(mismatch and source_mode == "consigned")
                         result["needs_sheet_manufacturer"] = needs_sheet
-                        if mismatch and source_mode == "catalogue" and result["status"] != "blocked":
+                        if mismatch and source_mode == "catalogue" and result["status"] in {"ready", "complete"}:
                             result["reason"] = "Ordinary JLC catalogue part; spreadsheet MPN is not imported"
-                        if needs_sheet and result["part"] and result["status"] == "complete":
+                        if needs_sheet and result["part"] and result["status"] in {"complete", "review"}:
                             # A previous import may already have attached the interchangeable
                             # sheet MPN to this same Part. Do not demand approval again.
                             from company.models import ManufacturerPart
@@ -300,9 +328,9 @@ class CatalogueImportService:
                             ).select_related("manufacturer")[:2])
                             if len(sheet_parts) == 1 and sheet_parts[0].manufacturer.is_manufacturer:
                                 result["needs_sheet_manufacturer"] = False
-                                result["reason"] = "Both manufacturer numbers already exist on this Part"
-                                results.append(result)
-                                continue
+                                needs_sheet = False
+                                if result["status"] == "complete":
+                                    result["reason"] = "Both manufacturer numbers already exist on this Part"
                         if needs_sheet and (result["status"] != "blocked" or result["reason"] == "Existing Part has a different Manufacturer Part; resolve its identity manually"):
                             if result["status"] == "blocked":
                                 result["needs_category"] = True
@@ -392,18 +420,32 @@ class CatalogueImportService:
             return _blocked("Existing Part has a different Manufacturer Part; resolve its identity manually")
 
         template = ParameterTemplate.objects.filter(name__iexact="Package").first()
+        jlc_template = ParameterTemplate.objects.filter(name__iexact="JLC Package").first()
         content_type = ContentType.objects.get_for_model(Part)
-        if template and template.model_type_id not in (None, content_type.pk):
-            return _blocked("Existing Package parameter template belongs to another model")
-        if template and (template.checkbox or template.units or template.get_choices()):
-            return _blocked("Existing Package parameter template is not a free-text package field")
+        for current_template, label in ((template, "Package"), (jlc_template, "JLC Package")):
+            if current_template and current_template.model_type_id not in (None, content_type.pk):
+                return _blocked(f"Existing {label} parameter template belongs to another model")
+            if current_template and (current_template.checkbox or current_template.units or current_template.get_choices()):
+                return _blocked(f"Existing {label} parameter template is not a free-text package field")
         has_package = False
+        existing_package = ""
+        recorded_jlc_package = ""
         if part and template:
             values = list(Parameter.objects.filter(model_type=content_type, model_id=part.pk, template=template)[:2])
-            if len(values) > 1 or (values and normalize_identifier(values[0].data) != normalize_identifier(product.package)):
-                return _blocked("Existing Part has a different Package parameter")
+            if len(values) > 1:
+                return _blocked("Existing Part has multiple Package parameters")
             has_package = bool(values)
+            existing_package = str(values[0].data) if values else ""
+        if part and jlc_template:
+            jlc_values = list(Parameter.objects.filter(model_type=content_type, model_id=part.pk, template=jlc_template)[:2])
+            if len(jlc_values) > 1:
+                return _blocked("Existing Part has multiple JLC Package parameters")
+            recorded_jlc_package = str(jlc_values[0].data) if jlc_values else ""
+        needs_package_resolution = package_needs_resolution(
+            existing_package, recorded_jlc_package, product.package
+        )
         if part and part.locked and (not maker_part or not supplier_part or not has_package
+                                    or needs_package_resolution
                                     or (product.description and not part.description)
                                     or (sheet_manufacturer and not sheet_part) or (maker_part and not maker_part.link)
                                     or (sheet_link and sheet_part and not sheet_part.link)):
@@ -413,22 +455,30 @@ class CatalogueImportService:
             (product.manufacturer_description and not manufacturer.description)
             or (product.manufacturer_website and not manufacturer.website)
         ))
-        complete = bool(part and manufacturer and manufacturer.is_manufacturer and supplier and maker_part and supplier_part and has_package
+        complete = bool(part and manufacturer and manufacturer.is_manufacturer and supplier and maker_part and supplier_part
+                        and has_package and not needs_package_resolution
                         and (not sheet_manufacturer or sheet_part)
                         and maker_part.link
                         and (not sheet_link or (sheet_part and sheet_part.link == sheet_link))
                         and supplier_part.manufacturer_part_id == maker_part.pk
                         and (part.description or not product.description) and not company_metadata_missing)
         return {
-            "status": "complete" if complete else "ready",
-            "reason": "All catalogue records already exist" if complete else "Ready to create missing catalogue records",
+            "status": "review" if needs_package_resolution else "complete" if complete else "ready",
+            "reason": (
+                f"Confirm Package mapping: existing {existing_package!r}, JLC {product.package!r}"
+                if needs_package_resolution else
+                "All catalogue records already exist" if complete else "Ready to create missing catalogue records"
+            ),
             "part": {"pk": part.pk, "name": part.name} if part else None,
             "needs_category": part is None,
             "needs_jlc_manufacturer": needs_jlc_manufacturer,
+            "needs_package_resolution": needs_package_resolution,
+            "existing_package": existing_package,
+            "recorded_jlc_package": recorded_jlc_package,
         }
 
     def apply(self, rows: list[dict], category_ids: dict, manufacturer_choices: dict,
-              sheet_links: dict,
+              package_choices: dict, sheet_links: dict,
               reviewed_mpns: dict, reviewed_manufacturers: dict, source_choices: dict,
               reviewed_source_modes: dict, user, only_row=None) -> dict:
         """Re-fetch source facts and re-plan inside one transaction before writing."""
@@ -451,7 +501,8 @@ class CatalogueImportService:
             content_type = ContentType.objects.get_for_model(Part)
             output = {"created_parts": 0, "created_categories": 0, "created_manufacturers": 0,
                       "promoted_manufacturers": 0, "created_supplier": 0,
-                      "created_mpn": 0, "created_sku": 0, "created_package": 0, "updated_links": 0,
+                      "created_mpn": 0, "created_sku": 0, "created_package": 0,
+                      "created_jlc_package": 0, "updated_package": 0, "updated_links": 0,
                       "existing": 0, "saved_rows": [], "skipped": []}
             for item in preview["rows"]:
                 row = item["row"]
@@ -492,6 +543,16 @@ class CatalogueImportService:
                 if fresh["status"] == "blocked":
                     output["skipped"].append({"code": code, "reason": fresh["reason"]})
                     continue
+                package_action = ""
+                custom_package = ""
+                if fresh.get("needs_package_resolution"):
+                    try:
+                        package_action, custom_package = validate_package_choice(
+                            package_choices.get(row_key), fresh.get("existing_package", "")
+                        )
+                    except CatalogueError as exc:
+                        output["skipped"].append({"code": code, "reason": str(exc)})
+                        continue
                 if fresh["status"] == "complete":
                     output["existing"] += 1
                     output["saved_rows"].append(row["row"])
@@ -611,11 +672,40 @@ class CatalogueImportService:
                 template = ParameterTemplate.objects.filter(name__iexact="Package").first()
                 if template is None:
                     template = ParameterTemplate.objects.create(name="Package", model_type=content_type, enabled=True)
-                if not Parameter.objects.filter(model_type=content_type, model_id=part.pk, template=template).exists():
+                package_parameter = Parameter.objects.filter(
+                    model_type=content_type, model_id=part.pk, template=template
+                ).first()
+                resolved_package = (product.package if package_action == "use_jlc" else
+                                    custom_package if package_action == "custom" else "")
+                if package_parameter is None:
                     parameter = Parameter(content_object=part, template=template, data=product.package)
                     parameter.full_clean()
                     parameter.save()
                     output["created_package"] += 1
+                elif resolved_package and normalize_identifier(package_parameter.data) != normalize_identifier(resolved_package):
+                    package_parameter.data = resolved_package
+                    package_parameter.full_clean()
+                    package_parameter.save(update_fields=["data"])
+                    output["updated_package"] += 1
+                if package_action:
+                    jlc_template = ParameterTemplate.objects.filter(name__iexact="JLC Package").first()
+                    if jlc_template is None:
+                        jlc_template = ParameterTemplate.objects.create(
+                            name="JLC Package", model_type=content_type, enabled=True
+                        )
+                    jlc_parameter = Parameter.objects.filter(
+                        model_type=content_type, model_id=part.pk, template=jlc_template
+                    ).first()
+                    if jlc_parameter is None:
+                        jlc_parameter = Parameter(content_object=part, template=jlc_template, data=product.package)
+                        jlc_parameter.full_clean()
+                        jlc_parameter.save()
+                        output["created_jlc_package"] += 1
+                    elif normalize_identifier(jlc_parameter.data) != normalize_identifier(product.package):
+                        jlc_parameter.data = product.package
+                        jlc_parameter.full_clean()
+                        jlc_parameter.save(update_fields=["data"])
+                        output["updated_package"] += 1
                 output["saved_rows"].append(row["row"])
             return output
 

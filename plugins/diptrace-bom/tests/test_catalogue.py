@@ -20,8 +20,10 @@ from inventree_diptrace_bom.catalogue import (
     compare_row,
     consignment_source,
     group_manufacturer_parts,
+    package_needs_resolution,
     parse_jlc_page,
     reviewed_sheet_mpn,
+    validate_package_choice,
     validate_external_link,
 )
 from inventree_diptrace_bom.parser import parse_bom
@@ -73,6 +75,22 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(consignment_source("0", "consigned"), "catalogue")
         with self.assertRaisesRegex(CatalogueError, "Invalid JLCPCB source choice"):
             consignment_source("0", "global")
+
+    def test_package_resolution_uses_saved_jlc_value(self):
+        self.assertTrue(package_needs_resolution("0805 (2012 Metric)", "", "0805"))
+        self.assertFalse(package_needs_resolution("0805", "", "0805"))
+        self.assertFalse(package_needs_resolution("0805 (2012 Metric)", "0805", "0805"))
+        self.assertTrue(package_needs_resolution("0805 (2012 Metric)", "0603", "0805"))
+
+    def test_manual_package_choices_are_guarded(self):
+        self.assertEqual(validate_package_choice({"action": "keep_existing"}, "0805 (2012 Metric)"),
+                         ("keep_existing", ""))
+        self.assertEqual(validate_package_choice({"action": "use_jlc"}, "0805"), ("use_jlc", ""))
+        self.assertEqual(validate_package_choice({"action": "custom", "custom_value": " 0805   metric "}, "0805"),
+                         ("custom", "0805 metric"))
+        for choice in ({}, {"action": "different"}, {"action": "custom", "custom_value": ""}):
+            with self.subTest(choice=choice), self.assertRaises(CatalogueError):
+                validate_package_choice(choice, "0805")
 
     def test_catalogue_reads_private_library_balances_not_inventree_stock(self):
         class ApiClient:
@@ -294,6 +312,15 @@ class CatalogueTests(unittest.TestCase):
         self.assertNotIn('id="message"', catalogue)
         self.assertIn("function resultNotice(", catalogue)
         self.assertNotIn("0 Parts, 0 categories", catalogue)
+
+    def test_catalogue_offers_persistent_manual_package_resolution(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        for value in ("keep_existing", "use_jlc", "custom", "different"):
+            self.assertIn(f"option('{value}'", template)
+        self.assertIn("Existing Package:", template)
+        self.assertIn("JLC Package", template)
+        self.assertIn("packages[tr.dataset.row]", template)
 
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]
