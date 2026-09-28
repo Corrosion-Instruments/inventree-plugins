@@ -233,7 +233,6 @@ class JlcStockSyncService:
                 .filter(
                     batch__startswith=MANAGED_BATCH_PREFIX,
                 )
-                .select_related("supplier_part", "part")
                 .order_by("pk")
             )
             managed_by_key: dict[tuple[str, str], list[Any]] = defaultdict(list)
