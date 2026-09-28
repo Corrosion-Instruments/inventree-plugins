@@ -75,6 +75,7 @@ def group_manufacturer_parts(records) -> dict[int, list[dict]]:
         grouped.setdefault(record.part_id, []).append({
             "mpn": record.MPN,
             "manufacturer": record.manufacturer.name,
+            "part": {"pk": record.part_id, "name": record.part.name},
         })
     return grouped
 
@@ -285,6 +286,7 @@ class CatalogueImportService:
         for row in rows:
             code = str(row.get("jlcpcb_part") or "").upper()
             result = {"row": row, "status": "blocked", "reason": "", "product": None, "part": None,
+                      "linked_parts": [],
                       "manufacturer_parts": [],
                       "needs_category": False, "needs_sheet_manufacturer": False,
                       "needs_jlc_manufacturer": False, "needs_source_choice": False,
@@ -346,17 +348,25 @@ class CatalogueImportService:
              "parent_id": category.parent_id, "structural": category.structural}
             for category in PartCategory.objects.all().order_by("name")
         ]
-        part_ids = {item["part"]["pk"] for item in results if item["part"]}
+        part_ids = {
+            part["pk"]
+            for item in results
+            for part in (item.get("linked_parts") or ([item["part"]] if item["part"] else []))
+        }
         saved_makers: dict[int, list[dict]] = {}
         if part_ids:
             saved_makers = group_manufacturer_parts(
                 ManufacturerPart.objects.filter(part_id__in=part_ids).select_related(
-                    "manufacturer"
-                ).order_by("manufacturer__name", "MPN", "pk")
+                    "manufacturer", "part"
+                ).order_by("part__name", "part_id", "manufacturer__name", "MPN", "pk")
             )
         for item in results:
-            if item["part"]:
-                item["manufacturer_parts"] = saved_makers.get(item["part"]["pk"], [])
+            linked_parts = item.get("linked_parts") or ([item["part"]] if item["part"] else [])
+            item["manufacturer_parts"] = [
+                record
+                for part in linked_parts
+                for record in saved_makers.get(part["pk"], [])
+            ]
         return {
             "rows": results,
             "categories": categories,
@@ -399,13 +409,21 @@ class CatalogueImportService:
         maker_part = maker_parts[0] if maker_parts else None
         sheet_part = sheet_parts[0] if sheet_parts else None
         supplier_part = supplier_parts[0] if supplier_parts else None
+        linked_parts = {
+            record.part_id: {"pk": record.part_id, "name": record.part.name}
+            for record in (maker_part, sheet_part, supplier_part) if record
+        }
+        linked_part_list = list(linked_parts.values())
         if sheet_part and sheet_link and sheet_part.link and sheet_part.link != sheet_link:
-            return _blocked("Existing spreadsheet Manufacturer Part has a different link; edit that record manually")
+            return _blocked("Existing spreadsheet Manufacturer Part has a different link; edit that record manually",
+                            linked_part_list)
         linked_ids = {record.part_id for record in (maker_part, sheet_part, supplier_part) if record}
         if len(linked_ids) > 1:
-            return _blocked("Manufacturer and supplier records point to different InvenTree Parts")
+            return _blocked("Manufacturer and supplier records point to different InvenTree Parts",
+                            linked_part_list)
         if supplier_part and supplier_part.manufacturer_part_id not in (None, getattr(maker_part, "pk", None)):
-            return _blocked("JLCPCB supplier record points to a different Manufacturer Part")
+            return _blocked("JLCPCB supplier record points to a different Manufacturer Part",
+                            linked_part_list)
         part = maker_part.part if maker_part else supplier_part.part if supplier_part else sheet_part.part if sheet_part else None
         linked_part = part is not None
         if part is None:
@@ -470,6 +488,7 @@ class CatalogueImportService:
                 "All catalogue records already exist" if complete else "Ready to create missing catalogue records"
             ),
             "part": {"pk": part.pk, "name": part.name} if part else None,
+            "linked_parts": ([{"pk": part.pk, "name": part.name}] if part else linked_part_list),
             "needs_category": part is None,
             "needs_jlc_manufacturer": needs_jlc_manufacturer,
             "needs_package_resolution": needs_package_resolution,
@@ -710,8 +729,9 @@ class CatalogueImportService:
             return output
 
 
-def _blocked(reason: str) -> dict:
-    return {"status": "blocked", "reason": reason, "part": None, "needs_category": False}
+def _blocked(reason: str, linked_parts: list[dict] | None = None) -> dict:
+    return {"status": "blocked", "reason": reason, "part": None,
+            "linked_parts": linked_parts or [], "needs_category": False}
 
 
 def validate_external_link(value: str | None) -> str:

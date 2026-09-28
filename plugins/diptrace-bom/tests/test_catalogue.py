@@ -204,14 +204,29 @@ class CatalogueTests(unittest.TestCase):
     def test_saved_manufacturer_parts_group_under_one_internal_part(self):
         records = [
             types.SimpleNamespace(part_id=1939, MPN="0402CG101J500NT",
+                                  part=types.SimpleNamespace(name="0402CG101J500NT"),
                                   manufacturer=types.SimpleNamespace(name="FH (Guangdong Fenghua Advanced Tech)")),
             types.SimpleNamespace(part_id=1939, MPN="CC0402JRNPO9BN101",
+                                  part=types.SimpleNamespace(name="0402CG101J500NT"),
                                   manufacturer=types.SimpleNamespace(name="Yageo")),
         ]
         self.assertEqual(group_manufacturer_parts(records), {1939: [
-            {"mpn": "0402CG101J500NT", "manufacturer": "FH (Guangdong Fenghua Advanced Tech)"},
-            {"mpn": "CC0402JRNPO9BN101", "manufacturer": "Yageo"},
+            {"mpn": "0402CG101J500NT", "manufacturer": "FH (Guangdong Fenghua Advanced Tech)",
+             "part": {"pk": 1939, "name": "0402CG101J500NT"}},
+            {"mpn": "CC0402JRNPO9BN101", "manufacturer": "Yageo",
+             "part": {"pk": 1939, "name": "0402CG101J500NT"}},
         ]})
+
+    def test_saved_manufacturer_parts_keep_distinct_internal_parts(self):
+        records = [
+            types.SimpleNamespace(part_id=10, MPN="MPN-A", part=types.SimpleNamespace(name="Part A"),
+                                  manufacturer=types.SimpleNamespace(name="Maker A")),
+            types.SimpleNamespace(part_id=20, MPN="MPN-B", part=types.SimpleNamespace(name="Part B"),
+                                  manufacturer=types.SimpleNamespace(name="Maker B")),
+        ]
+        grouped = group_manufacturer_parts(records)
+        self.assertEqual(grouped[10][0]["part"], {"pk": 10, "name": "Part A"})
+        self.assertEqual(grouped[20][0]["part"], {"pk": 20, "name": "Part B"})
 
     def test_row_save_selects_one_line_and_rejects_full_file_conflicts(self):
         rows = [
@@ -343,6 +358,15 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("link.rel = 'noopener noreferrer'", template)
         self.assertIn("`${part.name} ↗`", template)
         self.assertNotIn("`Internal Part: ${item.part.name}`", template)
+
+    def test_saved_manufacturer_parts_show_each_linked_internal_part(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertIn("heading.textContent = 'Linked internal Parts:'", template)
+        self.assertIn("for (const part of linkedParts)", template)
+        self.assertIn("groups.set(key, {part: record.part, records: []})", template)
+        self.assertIn("partLink.textContent = `${group.part.name} ↗`", template)
+        self.assertIn("partLink.target = '_blank'", template)
 
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]

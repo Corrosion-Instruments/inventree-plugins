@@ -388,16 +388,34 @@
     td.appendChild(wrap); tr.appendChild(td);
   }
   function savedManufacturerParts(td, item) {
-    if (!item.manufacturer_parts?.length) return false;
+    const linkedParts = item.linked_parts?.length ? item.linked_parts : (item.part ? [item.part] : []);
+    if (!linkedParts.length && !item.manufacturer_parts?.length) return false;
     const wrap = document.createElement('div'); wrap.className = 'saved-makers';
-    const heading = document.createElement('strong'); heading.textContent = 'Linked to this internal Part:';
-    const list = document.createElement('ul');
-    for (const record of item.manufacturer_parts) {
-      const entry = document.createElement('li');
-      entry.textContent = `${record.manufacturer} — ${record.mpn}`;
-      list.appendChild(entry);
+    const heading = document.createElement('strong'); heading.textContent = 'Linked internal Parts:';
+    wrap.appendChild(heading);
+    const groups = new Map();
+    for (const part of linkedParts) groups.set(String(part.pk), {part, records: []});
+    for (const record of (item.manufacturer_parts || [])) {
+      const key = String(record.part.pk);
+      if (!groups.has(key)) groups.set(key, {part: record.part, records: []});
+      groups.get(key).records.push(record);
     }
-    wrap.append(heading, list); td.appendChild(wrap);
+    for (const group of groups.values()) {
+      const partLink = document.createElement('a'); partLink.className = 'part-link';
+      partLink.href = `/web/part/${encodeURIComponent(group.part.pk)}/`;
+      partLink.target = '_blank'; partLink.rel = 'noopener noreferrer';
+      partLink.textContent = `${group.part.name} ↗`;
+      partLink.setAttribute('aria-label', `Open InvenTree Part ${group.part.name}`);
+      const list = document.createElement('ul');
+      for (const record of group.records) {
+        const entry = document.createElement('li');
+        entry.textContent = `${record.manufacturer} — ${record.mpn}`;
+        list.appendChild(entry);
+      }
+      wrap.appendChild(partLink);
+      if (group.records.length) wrap.appendChild(list);
+    }
+    td.appendChild(wrap);
     return true;
   }
   function manufacturerControls(tr, item) {
