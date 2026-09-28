@@ -351,6 +351,24 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("fromCatalogue ? 'Catalogue Review Complete' : 'BOM File Ready'", importer)
         self.assertIn("url.searchParams.delete('from')", importer)
 
+    def test_bom_importer_can_create_and_select_an_assembly(self):
+        root = Path(__file__).resolve().parents[1]
+        importer = (root / "inventree_diptrace_bom/templates/inventree_diptrace_bom/import.html").read_text(
+            encoding="utf-8"
+        )
+        plugin = (root / "inventree_diptrace_bom/plugin.py").read_text(encoding="utf-8")
+        self.assertIn('id="assembly-dialog"', importer)
+        self.assertIn('id="assembly-name"', importer)
+        self.assertIn('id="assembly-category"', importer)
+        self.assertIn("function appendCreateAssemblyAction()", importer)
+        self.assertIn("async function createAssembly()", importer)
+        self.assertIn("const result = await postJson('assemblies/'", importer)
+        self.assertIn("selectAssembly(assembly)", importer)
+        self.assertIn('path("assemblies/", self.assemblies', plugin)
+        self.assertIn('PartCategory.objects.filter(structural=False)', plugin)
+        self.assertIn('assembly=True', plugin)
+        self.assertIn('check_user_permission(request.user, Part, "add")', plugin)
+
     def test_catalogue_uses_compact_toast_notifications(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")

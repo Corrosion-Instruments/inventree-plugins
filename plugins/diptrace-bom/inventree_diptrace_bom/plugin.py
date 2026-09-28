@@ -25,7 +25,7 @@ from plugin.mixins import (
 from .catalogue import CatalogueError, CatalogueImportService, apply_sheet_mpn_overrides
 from .jlcpcb import JlcApiError, JlcClient
 from .parser import BomParseError, parse_bom
-from .services import BomImportError, BomImportService
+from .services import BomImportError, BomImportService, part_summary
 from .stock_sync import JlcStockSyncError, JlcStockSyncService
 
 __all__ = []
@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.6.12"
+    VERSION = "0.6.13"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -446,6 +446,91 @@ class DipTraceBomPlugin(
             rows = service.search_parts(request.GET.get("q", ""))
         return JsonResponse({"parts": rows})
 
+    def assemblies(self, request):
+        """List assembly categories or create a new BOM target assembly."""
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+
+        from part.models import Part, PartCategory
+
+        if request.method == "GET":
+            categories = [
+                {
+                    "pk": category.pk,
+                    "name": category.name,
+                    "path": category.pathstring or category.name,
+                }
+                for category in PartCategory.objects.filter(structural=False).order_by("name")
+            ]
+            categories.sort(key=lambda category: category["path"].casefold())
+            return JsonResponse({"categories": categories})
+
+        try:
+            data = json_request(request)
+        except BomImportError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        from django.db import IntegrityError, transaction
+        from users.permissions import check_user_permission
+
+        if not check_user_permission(request.user, Part, "add"):
+            return JsonResponse({"error": "Missing add permission for Part"}, status=403)
+
+        name = str(data.get("name") or "").strip()
+        ipn = str(data.get("ipn") or "").strip()
+        description = str(data.get("description") or "").strip()
+        category_id = data.get("category_id")
+        if not name:
+            return JsonResponse({"error": "Enter an assembly name"}, status=400)
+        if len(name) > 100:
+            return JsonResponse({"error": "Assembly name must be 100 characters or fewer"}, status=400)
+        if len(ipn) > 100:
+            return JsonResponse({"error": "IPN must be 100 characters or fewer"}, status=400)
+        if len(description) > 250:
+            return JsonResponse({"error": "Description must be 250 characters or fewer"}, status=400)
+
+        try:
+            category = PartCategory.objects.filter(pk=int(category_id), structural=False).first()
+        except (TypeError, ValueError):
+            category = None
+        if category is None:
+            return JsonResponse({"error": "Choose a non-structural category for the assembly"}, status=400)
+
+        if ipn:
+            existing = Part.objects.filter(IPN__iexact=ipn).first()
+            if existing:
+                if existing.assembly:
+                    return JsonResponse({
+                        "assembly": part_summary(existing),
+                        "created": False,
+                    })
+                return JsonResponse({
+                    "error": f"IPN '{ipn}' already belongs to a Part that is not marked as an assembly"
+                }, status=409)
+
+        try:
+            with transaction.atomic():
+                assembly = Part(
+                    name=name,
+                    IPN=ipn,
+                    description=description,
+                    category=category,
+                    assembly=True,
+                    component=True,
+                    purchaseable=False,
+                    active=True,
+                    creation_user=request.user,
+                )
+                assembly.full_clean()
+                assembly.save()
+        except (IntegrityError, ValidationError) as exc:
+            return JsonResponse({"error": f"Could not create assembly: {exc}"}, status=400)
+
+        return JsonResponse({
+            "assembly": part_summary(assembly),
+            "created": True,
+        }, status=201)
+
     def get_ui_dashboard_items(self, request, context, **kwargs):
         return [
             {
@@ -498,6 +583,7 @@ class DipTraceBomPlugin(
             path("preview/", self.preview, name="preview"),
             path("finalize/", self.finalize, name="finalize"),
             path("parts/", self.parts, name="parts"),
+            path("assemblies/", self.assemblies, name="assemblies"),
         ]
 
 

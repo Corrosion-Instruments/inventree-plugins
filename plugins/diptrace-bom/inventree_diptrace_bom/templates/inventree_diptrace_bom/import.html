@@ -35,8 +35,8 @@
     body { margin:0; min-width:320px; font-family:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--canvas); }
     a { color:var(--action); text-decoration:none; }
     a:hover { color:var(--action-hover); text-decoration:underline; text-underline-offset:3px; }
-    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
-    button,input,select { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
+    a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid rgba(0,0,0,.18); outline-offset:2px; }
+    button,input,select,textarea { font:inherit; touch-action:manipulation; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
     button,.workflow-note { min-height:36px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:6px; padding:0 12px; font-family:inherit; font-size:13px; font-weight:500; line-height:1; white-space:nowrap; }
     button { border:1px solid var(--action); background:var(--action); color:#fff; cursor:pointer; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,opacity .15s ease; }
     button:hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); }
@@ -49,8 +49,9 @@
     button.icon-button { width:36px; min-height:36px; display:grid; place-items:center; border-color:transparent; padding:0; background:transparent; color:var(--muted); font-size:20px; line-height:1; }
     button.icon-button:hover:not(:disabled) { border-color:var(--line-soft); background:var(--band); color:var(--ink); }
     button:disabled { opacity:.55; cursor:not-allowed; }
-    input,select { min-height:36px; width:100%; border:1px solid var(--line); border-radius:6px; padding:0 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
-    input:hover,select:hover { border-color:#98a2b3; }
+    input,select,textarea { min-height:36px; width:100%; border:1px solid var(--line); border-radius:6px; padding:0 11px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+    textarea { min-height:84px; resize:vertical; padding:9px 11px; line-height:1.45; }
+    input:hover,select:hover,textarea:hover { border-color:#98a2b3; }
     input::placeholder { color:var(--subtle); }
     .icon { flex:none; width:15px; height:15px; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; fill:none; }
     .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
@@ -99,6 +100,9 @@
     .combobox-option strong,.combobox-option small { display:block; overflow-wrap:anywhere; }
     .combobox-option small { margin-top:3px; color:var(--muted); font-weight:400; line-height:1.35; }
     .combobox-empty { padding:12px; color:var(--muted); font-size:13px; line-height:1.45; }
+    .combobox-create-wrap { border-top:1px solid var(--line-soft); padding:7px; background:var(--band); }
+    button.combobox-create { width:100%; min-height:40px; justify-content:flex-start; border-color:transparent; padding:0 10px; background:transparent; color:var(--ink); text-align:left; white-space:normal; }
+    button.combobox-create:hover:not(:disabled) { border-color:var(--line-soft); background:var(--surface); color:var(--ink); }
     .combobox-status { min-height:18px; color:var(--muted); font-size:12px; font-weight:400; line-height:1.45; }
     .file-control { min-width:0; min-height:36px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; overflow:hidden; border:1px solid var(--line); border-radius:6px; background:var(--surface); box-shadow:var(--shadow); }
     .file-control:hover { border-color:#98a2b3; }
@@ -221,6 +225,9 @@
     .dialog-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
     .dialog-header h2 { margin:0; font-size:19px; font-weight:500; }
     .dialog-header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+    .dialog-form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .dialog-form .field-wide { grid-column:1 / -1; }
+    .required-mark { color:var(--danger); }
     .command-dialog { width:min(600px,calc(100% - 32px)); overflow:hidden; border-color:#d9dde5; border-radius:10px; background:var(--surface); box-shadow:0 26px 70px rgba(16,24,40,.28); }
     .command-shell { min-width:0; }
     .command-header { min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line-soft); padding:0 10px 0 14px; }
@@ -286,6 +293,8 @@
       .toast-region { left:12px; right:12px; width:auto; }
       .dialog-actions.split { flex-direction:column-reverse; }
       .dialog-actions.split button { width:100%; }
+      .dialog-form { grid-template-columns:1fr; }
+      .dialog-form .field-wide { grid-column:auto; }
     }
     @media(prefers-reduced-motion:reduce) {
       html { scroll-behavior:auto; }
@@ -320,11 +329,11 @@
                   <div class="combobox-control">
                     <div class="input-with-icon">
                       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-                      <input id="assembly-query" name="assembly_query" type="search" role="combobox" placeholder="Search assemblies by name or IPN…" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-expanded="false" aria-controls="assembly-options" aria-describedby="assembly-status">
+                      <input id="assembly-query" name="assembly_query" type="search" role="combobox" placeholder="Search assemblies by name or IPN…" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-expanded="false" aria-controls="assembly-option-list" aria-describedby="assembly-status">
                     </div>
                     <button id="assembly-toggle" class="combobox-toggle" type="button" aria-label="Show assembly options" aria-controls="assembly-options" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button>
                   </div>
-                  <div id="assembly-options" class="combobox-options hidden" role="listbox" aria-label="Assemblies"></div>
+                  <div id="assembly-options" class="combobox-options hidden"><div id="assembly-option-list" role="listbox" aria-label="Assemblies"></div></div>
                 </div>
                 <span id="assembly-status" class="combobox-status" aria-live="polite">Loading assemblies…</span>
               </div>
@@ -442,6 +451,41 @@
     </div>
   </dialog>
 
+  <dialog id="assembly-dialog" aria-labelledby="assembly-dialog-title" aria-describedby="assembly-dialog-description">
+    <form id="assembly-form" class="dialog-body">
+      <div class="dialog-header">
+        <div>
+          <h2 id="assembly-dialog-title">Create Assembly</h2>
+          <p id="assembly-dialog-description">Create the finished-product Part that will own this BOM.</p>
+        </div>
+        <button id="assembly-dialog-close" class="icon-button" type="button" aria-label="Close assembly dialog"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg></button>
+      </div>
+      <div class="dialog-form">
+        <div class="field">
+          <label for="assembly-name">Assembly name <span class="required-mark" aria-hidden="true">*</span></label>
+          <input id="assembly-name" name="name" type="text" maxlength="100" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="assembly-ipn">IPN <span class="field-help">(optional)</span></label>
+          <input id="assembly-ipn" name="ipn" type="text" maxlength="100" autocomplete="off" placeholder="Internal part number">
+        </div>
+        <div class="field field-wide">
+          <label for="assembly-category">Category <span class="required-mark" aria-hidden="true">*</span></label>
+          <select id="assembly-category" name="category_id" required><option value="">Choose a category</option></select>
+          <span class="field-help">Only categories that can contain Parts are shown.</span>
+        </div>
+        <div class="field field-wide">
+          <label for="assembly-description">Description <span class="field-help">(optional)</span></label>
+          <textarea id="assembly-description" name="description" maxlength="250" placeholder="What this assembly or finished product is"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions split">
+        <button id="assembly-cancel" class="secondary" type="button">Cancel</button>
+        <button id="assembly-create" type="submit">Create &amp; Select Assembly</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="part-dialog" class="command-dialog" aria-labelledby="part-dialog-title">
     <div class="command-shell">
       <div class="command-header">
@@ -459,15 +503,16 @@
   </dialog>
 
   <script>
-    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false, targetFilter: 'all', calculationExclusions: new Set() };
+    const state = { preview: null, activeRow: null, assemblyResults: [], assemblyActiveIndex: -1, assemblySearchTimer: null, selectedAssemblyText: '', selectedAssemblyId: '', assemblySelectionLock: false, assemblyCategoriesLoaded: false, assemblyReturnFocus: null, targetFilter: 'all', calculationExclusions: new Set() };
     const el = Object.fromEntries([
-      'assembly-query','assembly-toggle','assembly-options','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
+      'assembly-query','assembly-toggle','assembly-options','assembly-option-list','assembly-status','bom-file','bom-file-name','preview','review','metric-file','metric-lines',
       'metric-matched','metric-unresolved','metric-local-builds','metric-external-builds','build-target','target-analysis',
       'target-combined-summary','target-exclusion-summary','target-filter-all','target-filter-missing','target-shortage-list','bom-rows','final-section','mode','validate',
       'calculation-toolbar','calculation-exclusion-count','reset-calculation-exclusions',
       'create-missing-wrap','create-missing','finalize','part-dialog','part-query','part-search','part-results','part-close',
       'test-connection','sync-stock','toast-region','loading-dialog','loading-title','loading-message',
-      'confirm-dialog','confirm-cancel','confirm-accept'
+      'confirm-dialog','confirm-cancel','confirm-accept','assembly-dialog','assembly-form','assembly-dialog-close',
+      'assembly-name','assembly-ipn','assembly-category','assembly-description','assembly-cancel','assembly-create'
     ].map(id => [id, document.getElementById(id)]));
 
     function csrf() {
@@ -676,37 +721,51 @@
       el['assembly-query'].setAttribute('aria-activedescendant', active.id);
       active.scrollIntoView({block:'nearest'});
     }
+    function appendCreateAssemblyAction() {
+      el['assembly-options'].querySelector('.combobox-create-wrap')?.remove();
+      const wrap = document.createElement('div');
+      wrap.className = 'combobox-create-wrap';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'combobox-create';
+      const query = el['assembly-query'].value.trim();
+      button.textContent = query ? `＋ Create “${query}” as a new assembly` : '＋ Create a new assembly';
+      button.addEventListener('click', () => openAssemblyDialog().catch(error => showError(error, 'Assembly Setup Failed')));
+      wrap.appendChild(button);
+      el['assembly-options'].appendChild(wrap);
+    }
     function renderAssemblyOptions(parts) {
       state.assemblyResults = parts;
       state.assemblyActiveIndex = -1;
       el['assembly-query'].removeAttribute('aria-activedescendant');
-      el['assembly-options'].replaceChildren();
+      el['assembly-option-list'].replaceChildren();
       if (!parts.length) {
         const empty = document.createElement('div');
         empty.className = 'combobox-empty';
-        empty.textContent = 'No assemblies found. Try another name or IPN.';
-        el['assembly-options'].appendChild(empty);
-        return;
+        empty.textContent = 'No matching assemblies found.';
+        el['assembly-option-list'].appendChild(empty);
+      } else {
+        for (const [index, part] of parts.entries()) {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'combobox-option';
+          option.id = `assembly-option-${index}`;
+          option.dataset.index = String(index);
+          option.dataset.pk = String(part.pk);
+          option.tabIndex = -1;
+          option.setAttribute('role', 'option');
+          option.setAttribute('aria-selected', String(String(part.pk) === state.selectedAssemblyId));
+          const name = document.createElement('strong');
+          name.textContent = part.label || part.name || `Assembly ${part.pk}`;
+          const detail = document.createElement('small');
+          detail.textContent = [part.ipn, part.category].filter(Boolean).join(' · ') || 'Assembly part';
+          option.append(name, detail);
+          option.addEventListener('click', () => selectAssembly(part));
+          option.addEventListener('mouseenter', () => setActiveAssembly(index));
+          el['assembly-option-list'].appendChild(option);
+        }
       }
-      for (const [index, part] of parts.entries()) {
-        const option = document.createElement('button');
-        option.type = 'button';
-        option.className = 'combobox-option';
-        option.id = `assembly-option-${index}`;
-        option.dataset.index = String(index);
-        option.dataset.pk = String(part.pk);
-        option.tabIndex = -1;
-        option.setAttribute('role', 'option');
-        option.setAttribute('aria-selected', String(String(part.pk) === state.selectedAssemblyId));
-        const name = document.createElement('strong');
-        name.textContent = part.label || part.name || `Assembly ${part.pk}`;
-        const detail = document.createElement('small');
-        detail.textContent = [part.ipn, part.category].filter(Boolean).join(' · ') || 'Assembly part';
-        option.append(name, detail);
-        option.addEventListener('click', () => selectAssembly(part));
-        option.addEventListener('mouseenter', () => setActiveAssembly(index));
-        el['assembly-options'].appendChild(option);
-      }
+      appendCreateAssemblyAction();
     }
     async function searchAssemblies(openResults=true) {
       const requestedQuery = el['assembly-query'].value.trim();
@@ -726,6 +785,65 @@
     function queueAssemblySearch() {
       window.clearTimeout(state.assemblySearchTimer);
       state.assemblySearchTimer = window.setTimeout(() => searchAssemblies(true).catch(error => showError(error, 'Assembly Search Failed')), 250);
+    }
+    function suggestedAssemblyName() {
+      const query = el['assembly-query'].value.trim();
+      if (query) return query.slice(0, 100);
+      const file = el['bom-file'].files[0];
+      if (!file) return '';
+      return file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 100);
+    }
+    async function loadAssemblyCategories() {
+      if (state.assemblyCategoriesLoaded) return;
+      el['assembly-category'].disabled = true;
+      el['assembly-category'].replaceChildren(new Option('Loading categories…', ''));
+      try {
+        const result = await getJson('assemblies/');
+        const categories = result.categories || [];
+        el['assembly-category'].replaceChildren(new Option('Choose a category', ''));
+        for (const category of categories) {
+          el['assembly-category'].appendChild(new Option(category.path || category.name, String(category.pk)));
+        }
+        state.assemblyCategoriesLoaded = true;
+      } finally {
+        el['assembly-category'].disabled = false;
+      }
+    }
+    async function openAssemblyDialog() {
+      state.assemblyReturnFocus = document.activeElement;
+      setAssemblyOptionsOpen(false);
+      el['assembly-form'].reset();
+      el['assembly-name'].value = suggestedAssemblyName();
+      el['assembly-dialog'].showModal();
+      el['assembly-name'].focus({preventScroll:true});
+      await loadAssemblyCategories();
+    }
+    function closeAssemblyDialog() {
+      if (el['assembly-dialog'].open) el['assembly-dialog'].close();
+      if (state.assemblyReturnFocus instanceof HTMLElement) state.assemblyReturnFocus.focus({preventScroll:true});
+    }
+    async function createAssembly() {
+      if (!el['assembly-form'].reportValidity()) return;
+      el['assembly-create'].disabled = true;
+      el['assembly-create'].setAttribute('aria-busy', 'true');
+      try {
+        const result = await postJson('assemblies/', {
+          name: el['assembly-name'].value,
+          ipn: el['assembly-ipn'].value,
+          category_id: el['assembly-category'].value,
+          description: el['assembly-description'].value,
+        });
+        const assembly = result.assembly;
+        if (!assembly) throw new Error('The server did not return the assembly');
+        const remaining = state.assemblyResults.filter(part => String(part.pk) !== String(assembly.pk));
+        renderAssemblyOptions([assembly, ...remaining]);
+        selectAssembly(assembly);
+        closeAssemblyDialog();
+        notify(result.created === false ? 'The existing assembly was selected.' : 'The assembly was created and selected.', 'success', result.created === false ? 'Assembly Selected' : 'Assembly Created');
+      } finally {
+        el['assembly-create'].disabled = false;
+        el['assembly-create'].removeAttribute('aria-busy');
+      }
     }
     async function preview() {
       const assemblyId = state.selectedAssemblyId;
@@ -1124,6 +1242,13 @@
     el['part-search'].addEventListener('click',()=>searchParts().catch(error=>showError(error, 'Part Search Failed')));
     el['part-query'].addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchParts().catch(error=>showError(error, 'Part Search Failed'));}});
     el['part-close'].addEventListener('click',()=>el['part-dialog'].close());
+    el['assembly-dialog-close'].addEventListener('click', closeAssemblyDialog);
+    el['assembly-cancel'].addEventListener('click', closeAssemblyDialog);
+    el['assembly-dialog'].addEventListener('cancel', event => { event.preventDefault(); closeAssemblyDialog(); });
+    el['assembly-form'].addEventListener('submit', event => {
+      event.preventDefault();
+      createAssembly().catch(error => showError(error, 'Assembly Creation Failed'));
+    });
     el.finalize.addEventListener('click',()=>finalizeBom().catch(error=>showError(error, 'BOM Finalization Failed')));
     window.addEventListener('beforeunload', event => {
       if (!state.preview) return;
