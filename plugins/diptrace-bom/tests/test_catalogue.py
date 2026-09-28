@@ -438,22 +438,24 @@ class CatalogueTests(unittest.TestCase):
         self.assertNotIn("stockNumber(jlc.global_sourcing)", importer)
         self.assertNotIn("localAvailable + externalAvailable", importer)
 
-    def test_modern_navigation_routes_redirect_to_server_rendered_pages(self):
+    def test_dashboard_widget_links_to_server_rendered_pages(self):
         root = Path(__file__).resolve().parents[1]
         plugin = (root / "inventree_diptrace_bom/plugin.py").read_text(encoding="utf-8")
-        routes = (root / "inventree_diptrace_bom/static/diptrace_bom_routes.js").read_text(
+        dashboard = (root / "inventree_diptrace_bom/static/diptrace_bom_dashboard_v082.js").read_text(
             encoding="utf-8"
         )
-        self.assertIn('"options": {"url": f"/plugin/{self.SLUG}/"}', plugin)
-        self.assertIn('"options": {"url": f"/plugin/{self.SLUG}/planner/"}', plugin)
-        self.assertIn('"options": {"url": f"/plugin/{self.SLUG}/catalogue/"}', plugin)
-        self.assertNotIn('"options": {"url": f"plugin/{self.SLUG}/', plugin)
-        self.assertIn("def get_ui_routes(", plugin)
-        self.assertIn('"options": {"path": ""}', plugin)
-        self.assertIn('"options": {"path": "catalogue/"}', plugin)
-        self.assertIn('window.location.replace(target)', routes)
-        self.assertIn('redirectPage("/plugin/diptrace-bom/"', routes)
-        self.assertIn('redirectPage("/plugin/diptrace-bom/catalogue/"', routes)
+        self.assertNotIn("NavigationMixin", plugin)
+        self.assertNotIn("def get_ui_navigation_items(", plugin)
+        self.assertNotIn("def get_ui_routes(", plugin)
+        self.assertIn('"importer_url": f"/plugin/{self.SLUG}/"', plugin)
+        self.assertIn('"planner_url": f"/plugin/{self.SLUG}/planner/"', plugin)
+        self.assertIn('f"/plugin/{self.SLUG}/catalogue/" if request.user.is_staff else ""', plugin)
+        self.assertIn('data-tool="importer"', dashboard)
+        self.assertIn('data-tool="planner"', dashboard)
+        self.assertIn('data-tool="catalogue"', dashboard)
+        self.assertIn("setAttribute(\"href\", importerUrl)", dashboard)
+        self.assertIn("setAttribute(\"href\", plannerUrl)", dashboard)
+        self.assertIn("setAttribute(\"href\", catalogueUrl)", dashboard)
 
     def test_catalogue_uses_compact_toast_notifications(self):
         templates = (Path(__file__).resolve().parents[1]

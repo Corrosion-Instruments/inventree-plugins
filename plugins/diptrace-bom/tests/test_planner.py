@@ -107,16 +107,16 @@ class PlannerTests(unittest.TestCase):
         with self.assertRaisesRegex(BuildPlannerError, "Circular BOM"):
             RecursiveBuildPlanner(parts, 1)
 
-    def test_planner_page_exposes_routes_and_pool_explanation(self):
+    def test_planner_page_exposes_dashboard_link_and_pool_explanation(self):
         root = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom"
         template = (root / "templates/inventree_diptrace_bom/planner.html").read_text(encoding="utf-8")
         plugin = (root / "plugin.py").read_text(encoding="utf-8")
-        routes = (root / "static/diptrace_bom_routes.js").read_text(encoding="utf-8")
+        dashboard = (root / "static/diptrace_bom_dashboard_v082.js").read_text(encoding="utf-8")
         self.assertIn("Nested BOM Build Planner", template)
         self.assertIn("Public + Private / Pre-order", template)
         self.assertIn("route_overrides", template)
         self.assertIn('path("planner/"', plugin)
-        self.assertIn("redirectBuildPlanner", routes)
+        self.assertIn('data-tool="planner"', dashboard)
 
 
 if __name__ == "__main__":

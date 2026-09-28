@@ -15,7 +15,6 @@ from django.utils.translation import gettext_lazy as _
 
 from plugin import InvenTreePlugin
 from plugin.mixins import (
-    NavigationMixin,
     ScheduleMixin,
     SettingsMixin,
     UrlsMixin,
@@ -37,7 +36,6 @@ class DipTraceBomPlugin(
     ScheduleMixin,
     SettingsMixin,
     UrlsMixin,
-    NavigationMixin,
     UserInterfaceMixin,
     InvenTreePlugin,
 ):
@@ -47,17 +45,9 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.8.1"
+    VERSION = "0.8.2"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
-
-    NAVIGATION_TAB_NAME = "DipTrace BOM"
-    NAVIGATION_TAB_ICON = "fas fa-list-check"
-    NAVIGATION = [
-        {"name": "DipTrace BOM", "link": "plugin:diptrace-bom:index"},
-        {"name": "Build Planner", "link": "plugin:diptrace-bom:planner"},
-        {"name": "JLC Part Catalogue", "link": "plugin:diptrace-bom:catalogue"},
-    ]
 
     SCHEDULED_TASKS = {
         "jlc-stock-sync": {
@@ -566,81 +556,22 @@ class DipTraceBomPlugin(
         return [
             {
                 "key": "diptrace-bom-dashboard",
-                "title": _("DipTrace BOM"),
-                "description": _("Upload, resolve and check a PCB BOM"),
+                "title": _("DipTrace BOM Tools"),
+                "description": _("Import BOMs, plan nested builds and manage JLC parts"),
                 "icon": "ti:list-check",
                 "source": self.plugin_static_file(
-                    "diptrace_bom_dashboard_v024.js:renderDashboardItem"
+                    "diptrace_bom_dashboard_v082.js:renderDashboardItem"
                 ),
-                # Three 64 px dashboard rows are required for the title,
-                # description and action button without clipping.
-                "options": {"width": 3, "height": 3},
-                "context": {"url": f"/plugin/{self.SLUG}/"},
+                "options": {"width": 4, "height": 4},
+                "context": {
+                    "importer_url": f"/plugin/{self.SLUG}/",
+                    "planner_url": f"/plugin/{self.SLUG}/planner/",
+                    "catalogue_url": (
+                        f"/plugin/{self.SLUG}/catalogue/" if request.user.is_staff else ""
+                    ),
+                },
             }
         ]
-
-    def get_ui_navigation_items(self, request, context, **kwargs):
-        """Add a persistent importer link to the modern InvenTree navigation.
-
-        This is intentionally independent of the dashboard widget: users must
-        still be able to reach the importer when a browser cannot load a
-        plugin-provided dashboard script.
-        """
-        items = [
-            {
-                "key": "diptrace-bom-navigation",
-                "title": _("DipTrace BOM"),
-                "icon": "ti:list-check",
-                "options": {"url": f"/plugin/{self.SLUG}/"},
-            }
-        ]
-        if request.user.is_authenticated:
-            items.append({
-                "key": "diptrace-build-planner-navigation",
-                "title": _("Build Planner"),
-                "icon": "ti:hierarchy-3",
-                "options": {"url": f"/plugin/{self.SLUG}/planner/"},
-            })
-        if request.user.is_authenticated and request.user.is_staff:
-            items.append({
-                "key": "jlc-part-catalogue-navigation",
-                "title": _("JLC Part Catalogue"),
-                "icon": "ti:database-import",
-                "options": {"url": f"/plugin/{self.SLUG}/catalogue/"},
-            })
-        return items
-
-    def get_ui_routes(self, request, context, **kwargs):
-        """Bridge modern InvenTree routes to the plugin's server-rendered pages."""
-        routes = [
-            {
-                "key": "diptrace-bom-route",
-                "title": _("DipTrace BOM"),
-                "source": self.plugin_static_file(
-                    "diptrace_bom_routes.js:redirectBomImporter"
-                ),
-                "options": {"path": ""},
-            }
-        ]
-        if request.user.is_authenticated:
-            routes.append({
-                "key": "diptrace-build-planner-route",
-                "title": _("Build Planner"),
-                "source": self.plugin_static_file(
-                    "diptrace_bom_routes.js:redirectBuildPlanner"
-                ),
-                "options": {"path": "planner/"},
-            })
-        if request.user.is_authenticated and request.user.is_staff:
-            routes.append({
-                "key": "jlc-part-catalogue-route",
-                "title": _("JLC Part Catalogue"),
-                "source": self.plugin_static_file(
-                    "diptrace_bom_routes.js:redirectPartCatalogue"
-                ),
-                "options": {"path": "catalogue/"},
-            })
-        return routes
 
     def setup_urls(self):
         return [
