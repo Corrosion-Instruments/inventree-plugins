@@ -322,6 +322,18 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("JLC Package", template)
         self.assertIn("packages[tr.dataset.row]", template)
 
+    def test_catalogue_uses_accessible_confirmation_dialog(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertIn('<dialog id="apply-dialog"', template)
+        self.assertIn('aria-labelledby="apply-dialog-title"', template)
+        self.assertIn('aria-describedby="apply-dialog-message"', template)
+        self.assertIn("function confirmBulkImport()", template)
+        self.assertIn("applyDialog.addEventListener('cancel'", template)
+        self.assertIn("returnFocus.focus({preventScroll:true})", template)
+        self.assertIn("overscroll-behavior:contain", template)
+        self.assertNotIn("window.confirm(", template)
+
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")

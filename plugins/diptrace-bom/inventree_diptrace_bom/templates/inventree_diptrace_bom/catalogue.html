@@ -128,6 +128,15 @@
     .toast-copy { min-width:0; }
     .toast-copy strong { display:block; font-size:14px; line-height:1.35; }
     .toast-copy p { margin:3px 0 0; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
+    dialog { width:min(520px,calc(100% - 32px)); max-height:calc(100dvh - 40px); overflow:auto; border:1px solid var(--line-soft); border-radius:10px; padding:0; background:var(--surface); color:var(--ink); box-shadow:0 24px 48px rgba(16,24,40,.22); overscroll-behavior:contain; }
+    dialog::backdrop { background:rgba(16,24,40,.54); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); }
+    .dialog-body { display:grid; gap:20px; padding:22px; }
+    .dialog-header h2 { margin:0; font-size:19px; font-weight:600; line-height:1.35; }
+    .dialog-header p { margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.5; text-wrap:pretty; }
+    .dialog-actions { display:flex; justify-content:flex-end; gap:10px; }
+    .dialog-actions button { min-height:40px; }
+    .dialog-actions .secondary { border-color:var(--line); background:var(--surface); color:var(--ink); }
+    .dialog-actions .secondary:hover:not(:disabled) { border-color:#98a2b3; background:var(--band); color:var(--ink); }
     @keyframes toast-in { from { opacity:0; transform:translateY(-8px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(.98); } }
     .row-action { min-width: 115px; }
@@ -152,6 +161,8 @@
       .section-body { padding:16px; }
       .upload-row button { width:100%; }
       .toast-region { left:12px; right:12px; width:auto; }
+      .dialog-actions { flex-direction:column-reverse; }
+      .dialog-actions button { width:100%; min-height:44px; }
     }
     @media(prefers-reduced-motion:reduce) {
       html { scroll-behavior:auto; }
@@ -209,6 +220,18 @@
   </main>
 </div>
 <div id="toast-region" class="toast-region" role="region" aria-label="Notifications" aria-live="polite" aria-relevant="additions"></div>
+<dialog id="apply-dialog" aria-labelledby="apply-dialog-title" aria-describedby="apply-dialog-message">
+  <div class="dialog-body">
+    <div class="dialog-header">
+      <h2 id="apply-dialog-title">Import Approved Catalogue Rows?</h2>
+      <p id="apply-dialog-message">The importer will recheck ready and approved rows before updating InvenTree. Rows that still need information will be skipped.</p>
+    </div>
+    <div class="dialog-actions">
+      <button id="apply-dialog-cancel" class="secondary" type="button">Cancel</button>
+      <button id="apply-dialog-confirm" type="button">Import Approved Rows</button>
+    </div>
+  </div>
+</dialog>
 <script>
 (() => {
   const file = document.getElementById('file');
@@ -219,6 +242,10 @@
   const rows = document.getElementById('rows');
   const summary = document.getElementById('summary');
   const toastRegion = document.getElementById('toast-region');
+  const applyDialog = document.getElementById('apply-dialog');
+  const applyDialogMessage = document.getElementById('apply-dialog-message');
+  const applyDialogCancel = document.getElementById('apply-dialog-cancel');
+  const applyDialogConfirm = document.getElementById('apply-dialog-confirm');
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   let current = null;
   let draftKey = null;
@@ -257,6 +284,32 @@
       window.setTimeout(() => dismissToast(toast), timeout);
     }
     return toast;
+  }
+  function confirmBulkImport() {
+    return new Promise(resolve => {
+      const returnFocus = document.activeElement;
+      const candidateCount = current?.rows.filter(item => item.status === 'ready' || item.status === 'review').length || 0;
+      applyDialogMessage.textContent = `The importer will recheck ${candidateCount} ${candidateCount === 1 ? 'row' : 'rows'} before updating InvenTree. Rows that still need information will be skipped.`;
+      let settled = false;
+      const settle = accepted => {
+        if (settled) return;
+        settled = true;
+        applyDialog.removeEventListener('cancel', onCancel);
+        applyDialogCancel.removeEventListener('click', onReject);
+        applyDialogConfirm.removeEventListener('click', onAccept);
+        if (applyDialog.open) applyDialog.close();
+        if (returnFocus instanceof HTMLElement) returnFocus.focus({preventScroll:true});
+        resolve(accepted);
+      };
+      const onCancel = event => { event.preventDefault(); settle(false); };
+      const onReject = () => settle(false);
+      const onAccept = () => settle(true);
+      applyDialog.addEventListener('cancel', onCancel);
+      applyDialogCancel.addEventListener('click', onReject);
+      applyDialogConfirm.addEventListener('click', onAccept);
+      applyDialog.showModal();
+      applyDialogCancel.focus({preventScroll:true});
+    });
   }
   async function responseJson(response) {
     const body = await response.json();
@@ -602,7 +655,7 @@
         || Boolean(packageAction && packageAction !== 'different' && (packageAction !== 'custom' || customPackage));
       if (save) save.disabled = busy || changed || !packageReady;
     }
-    applyButton.disabled = busy || pending;
+    applyButton.disabled = busy || pending || !rows.querySelector('.save-item');
     return pending;
   }
   function collectPayload(rowNumber = null) {
@@ -702,7 +755,7 @@
   async function applyRows(rowNumber = null) {
     if (busy || !current) return;
     if (updatePendingRows()) return notify('A spreadsheet MPN changed. Check it again before saving.', 'warning', 'Recheck Required');
-    if (rowNumber === null && !window.confirm('Apply ready and explicitly approved catalogue rows to this InvenTree instance?')) return;
+    if (rowNumber === null && !(await confirmBulkImport())) return;
     const draft = persistDraft();
     const payload = collectPayload(rowNumber);
     setBusy(true);
