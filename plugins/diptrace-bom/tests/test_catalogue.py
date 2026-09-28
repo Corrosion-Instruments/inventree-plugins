@@ -274,6 +274,14 @@ class CatalogueTests(unittest.TestCase):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
         self.assertIn(".confirmation[hidden] { display: none; }", page.read_text(encoding="utf-8"))
 
+    def test_automatic_consigned_source_does_not_disable_row_save(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertIn("const source = tr.querySelector('.source-select');", template)
+        self.assertIn("const sourceChanged = source", template)
+        self.assertIn(": false;", template)
+        self.assertNotIn("(tr.querySelector('.source-select')?.value || '') !==", template)
+
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")

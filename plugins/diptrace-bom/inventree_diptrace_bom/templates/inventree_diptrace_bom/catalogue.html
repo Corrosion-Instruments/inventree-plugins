@@ -522,8 +522,12 @@
   function updatePendingRows() {
     let pending = false;
     for (const tr of rows.querySelectorAll('tr[data-row]')) {
+      const source = tr.querySelector('.source-select');
+      const sourceChanged = source
+        ? (source.value || '') !== (tr.dataset.reviewedSource || '')
+        : false;
       const changed = (tr.querySelector('.sheet-mpn').value.trim() !== tr.dataset.reviewedMpn
-        || (tr.querySelector('.source-select')?.value || '') !== (tr.dataset.reviewedSource || ''));
+        || sourceChanged);
       pending ||= changed;
       tr.querySelector('.unchecked-note').hidden = tr.querySelector('.sheet-mpn').value.trim() === tr.dataset.reviewedMpn;
       const save = tr.querySelector('.save-item');
