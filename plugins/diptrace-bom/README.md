@@ -100,7 +100,7 @@ fields. These fields remain blank when JLCPCB does not provide them.
 ## JLCPCB stock synchronization
 
 The plugin can mirror the three supported JLCPCB availability buckets into
-InvenTree external stock locations every 30 minutes:
+InvenTree external stock locations every 5 minutes:
 
 - public `stockCount` → Public Catalogue
 - `consignedParts` → Consigned Parts

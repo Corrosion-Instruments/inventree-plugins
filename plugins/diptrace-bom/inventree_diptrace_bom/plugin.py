@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.7.0"
+    VERSION = "0.7.1"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -61,7 +61,7 @@ class DipTraceBomPlugin(
         "jlc-stock-sync": {
             "func": "sync_jlc_stock",
             "schedule": "I",
-            "minutes": 30,
+            "minutes": 5,
         }
     }
 
@@ -104,7 +104,7 @@ class DipTraceBomPlugin(
         "ENABLE_JLC_STOCK_SYNC": {
             "name": _("Enable JLCPCB Stock Sync"),
             "description": _(
-                "Every 30 minutes, mirror JLCPCB public, pre-order and consigned quantities onto exact existing supplier-SKU matches"
+                "Every 5 minutes, mirror JLCPCB public, pre-order and consigned quantities onto exact existing supplier-SKU matches"
             ),
             "default": False,
             "validator": bool,
