@@ -111,7 +111,7 @@
     .source-choice { min-width: 200px; display: grid; gap: 5px; }
     .source-choice small { color:var(--muted); }
     .unchecked-note { color:var(--warn); font-size:12px; }
-    .source-link { display:inline-block; margin-top:4px; font-weight:500; text-decoration:underline; text-underline-offset:3px; }
+    .source-link,.part-link { display:inline-block; margin-top:4px; font-weight:500; text-decoration:underline; text-underline-offset:3px; }
     .source-note { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
     .package-resolution { min-width:240px; display:grid; gap:5px; margin-top:7px; }
     .package-resolution small { color:var(--muted); }
@@ -465,6 +465,17 @@
     }
     tr.appendChild(td);
   }
+  function internalPartCell(tr, part) {
+    if (!part) return cell(tr, '—');
+    const td = document.createElement('td');
+    const label = document.createElement('div'); label.textContent = 'Internal Part:';
+    const link = document.createElement('a'); link.className = 'part-link';
+    link.href = `/web/part/${encodeURIComponent(part.pk)}/`;
+    link.target = '_blank'; link.rel = 'noopener noreferrer';
+    link.textContent = `${part.name} ↗`;
+    link.setAttribute('aria-label', `Open InvenTree Part ${part.name}`);
+    td.append(label, link); tr.appendChild(td); return td;
+  }
   function packageControls(tr, item) {
     const td = document.createElement('td');
     const value = document.createElement('div'); value.textContent = item.product?.package || '—';
@@ -628,7 +639,7 @@
       status.title = item.product?.description || '';
       manufacturerControls(tr, item);
       if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item.row.row);
-      else cell(tr, item.part ? `Internal Part: ${item.part.name}` : '—');
+      else internalPartCell(tr, item.part);
       const action = document.createElement('td'); action.className = 'row-action';
       if (item.status === 'ready' || item.status === 'review') {
         const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Save this item';

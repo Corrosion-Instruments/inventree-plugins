@@ -334,6 +334,16 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("overscroll-behavior:contain", template)
         self.assertNotIn("window.confirm(", template)
 
+    def test_internal_part_names_link_to_inventree_details(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertIn("function internalPartCell(tr, part)", template)
+        self.assertIn("`/web/part/${encodeURIComponent(part.pk)}/`", template)
+        self.assertIn("link.target = '_blank'", template)
+        self.assertIn("link.rel = 'noopener noreferrer'", template)
+        self.assertIn("`${part.name} ↗`", template)
+        self.assertNotIn("`Internal Part: ${item.part.name}`", template)
+
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")
