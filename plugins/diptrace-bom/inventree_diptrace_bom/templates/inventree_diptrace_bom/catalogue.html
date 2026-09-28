@@ -78,7 +78,7 @@
     #summary { margin:0; border-radius:999px; padding:5px 10px; background:var(--action-soft); color:#475467; font-size:12px; font-weight:600; }
     .review-copy { max-width:1180px; margin:0 0 16px; font-size:13px; }
     .table-wrap { max-width:100%; max-height:min(70vh,800px); overflow:auto; border:1px solid var(--line-soft); border-radius:6px; overscroll-behavior:contain; }
-    table { width:100%; min-width:1900px; table-layout:auto; border-collapse:separate; border-spacing:0; font-size:13px; }
+    table { width:100%; min-width:1650px; table-layout:auto; border-collapse:separate; border-spacing:0; font-size:13px; }
     th,td { border-bottom:1px solid #e3e6eb; border-right:1px solid #e8eaee; padding:11px 10px; color:#253044; line-height:1.4; text-align:left; vertical-align:top; }
     th:last-child,td:last-child { border-right:0; }
     tbody tr:last-child td { border-bottom:0; }
@@ -86,11 +86,17 @@
     tbody tr:nth-child(even) td { background:#f7f8fa; }
     tbody tr:hover td { background:#eef3f8; }
     th { position:sticky; top:0; z-index:2; border-bottom-color:#cfd4dc; padding-top:14px; padding-bottom:14px; background:#eef0f3; color:#344054; font-size:12px; font-weight:600; line-height:1.2; white-space:nowrap; box-shadow:inset 0 -1px 0 rgba(16,24,40,.04); }
-    .status { min-width:220px; font-weight:600; }
-    .status.blocked { color:var(--danger); background:var(--danger-soft); }
-    .status.ready { color:var(--ok); background:var(--ok-soft); }
-    .status.review { color:var(--warn); background:var(--warn-soft); }
-    .status.complete { color:#475467; background:#f2f4f7; }
+    .decision-cell { min-width:132px; text-align:center; vertical-align:middle; }
+    button.decision-trigger { min-height:34px; border-radius:999px; padding:0 10px; background:var(--surface); font-weight:600; }
+    button.decision-trigger:hover:not(:disabled) { background:var(--surface); box-shadow:0 0 0 3px rgba(16,24,40,.08); }
+    button.decision-trigger.info { border-color:#84adff; color:#175cd3; background:#eff8ff; }
+    button.decision-trigger.success { border-color:#75e0a7; color:var(--ok); background:var(--ok-soft); }
+    button.decision-trigger.warning { border-color:#fec84b; color:var(--warn); background:var(--warn-soft); }
+    button.decision-trigger.error { border-color:#fda29b; color:var(--danger); background:var(--danger-soft); }
+    .decision-icon { width:17px; height:17px; flex:0 0 17px; }
+    .consigned-cell { text-align:center; vertical-align:middle; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .consigned-value { display:inline-flex; align-items:center; min-height:28px; border:1px solid var(--line-soft); border-radius:999px; padding:0 9px; background:#f2f4f7; color:#475467; font-weight:600; }
+    .consigned-value.yes { border-color:#75e0a7; background:var(--ok-soft); color:var(--ok); }
     .category, .manufacturer-choice { min-width: 230px; display: grid; gap: 5px; }
     .category small, .manufacturer-choice small { color:var(--muted); }
     .saved-makers { min-width: 220px; margin-top: 7px; }
@@ -112,7 +118,6 @@
     .source-choice small { color:var(--muted); }
     .unchecked-note { color:var(--warn); font-size:12px; }
     .source-link,.part-link { display:inline-block; margin-top:4px; font-weight:500; text-decoration:underline; text-underline-offset:3px; }
-    .source-note { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
     .package-resolution { min-width:240px; display:grid; gap:5px; margin-top:7px; }
     .package-resolution small { color:var(--muted); }
     .package-resolution .custom-package[hidden] { display:none; }
@@ -137,6 +142,25 @@
     .dialog-actions button { min-height:40px; }
     .dialog-actions .secondary { border-color:var(--line); background:var(--surface); color:var(--ink); }
     .dialog-actions .secondary:hover:not(:disabled) { border-color:#98a2b3; background:var(--band); color:var(--ink); }
+    #decision-dialog { width:min(580px,calc(100% - 32px)); }
+    .decision-dialog-header { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:12px; }
+    .decision-dialog-mark { width:36px; height:36px; display:grid; place-items:center; border:1px solid var(--line-soft); border-radius:50%; background:var(--action-soft); color:#475467; }
+    .decision-dialog-mark.info { border-color:#84adff; background:#eff8ff; color:#175cd3; }
+    .decision-dialog-mark.success { border-color:#75e0a7; background:var(--ok-soft); color:var(--ok); }
+    .decision-dialog-mark.warning { border-color:#fec84b; background:var(--warn-soft); color:var(--warn); }
+    .decision-dialog-mark.error { border-color:#fda29b; background:var(--danger-soft); color:var(--danger); }
+    .dialog-eyebrow { margin:0 0 3px; color:var(--muted); font-size:12px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; }
+    .decision-meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; overflow:hidden; border:1px solid var(--line-soft); border-radius:8px; background:var(--line-soft); }
+    .decision-meta div { min-width:0; padding:11px 12px; background:var(--band); }
+    .decision-meta dt { margin:0 0 3px; color:var(--muted); font-size:11px; font-weight:600; text-transform:uppercase; }
+    .decision-meta dd { margin:0; overflow-wrap:anywhere; color:var(--ink); font-size:13px; font-weight:500; }
+    .decision-message { border-left:3px solid currentColor; border-radius:0 8px 8px 0; padding:13px 14px; background:var(--band); color:#475467; }
+    .decision-message.info { background:#eff8ff; color:#175cd3; }
+    .decision-message.success { background:var(--ok-soft); color:var(--ok); }
+    .decision-message.warning { background:var(--warn-soft); color:var(--warn); }
+    .decision-message.error { background:var(--danger-soft); color:var(--danger); }
+    .decision-message h3 { margin:0 0 5px; font-size:13px; font-weight:700; }
+    .decision-message p { margin:0; color:var(--ink); font-size:14px; line-height:1.55; overflow-wrap:anywhere; }
     @keyframes toast-in { from { opacity:0; transform:translateY(-8px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(.98); } }
     .row-action { min-width: 115px; }
@@ -163,6 +187,8 @@
       .toast-region { left:12px; right:12px; width:auto; }
       .dialog-actions { flex-direction:column-reverse; }
       .dialog-actions button { width:100%; min-height:44px; }
+      button.icon-button,button.decision-trigger { min-height:44px; }
+      .decision-meta { grid-template-columns:1fr; }
     }
     @media(prefers-reduced-motion:reduce) {
       html { scroll-behavior:auto; }
@@ -208,7 +234,7 @@
         </div>
         <p class="muted review-copy">For each new Part, choose or create a category. Positive JLC consigned stock requires a spreadsheet-MPN comparison. A zero consigned balance is treated as an ordinary JLC catalogue part. Only consigned mismatches need a second manufacturer and interchangeability confirmation.</p>
         <div class="table-wrap"><table>
-          <thead><tr><th>Designators</th><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Consigned source</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
+          <thead><tr><th>JLC code</th><th>Original Footprint / Spreadsheet MPN</th><th>JLC MFR Part #</th><th>JLC manufacturer</th><th>Package</th><th>Consigned</th><th>Decision</th><th>Saved Manufacturer Parts / confirmation</th><th>Category / Internal Part</th><th>Action</th></tr></thead>
           <tbody id="rows"></tbody>
         </table></div>
         <div class="review-actions">
@@ -232,6 +258,30 @@
     </div>
   </div>
 </dialog>
+<dialog id="decision-dialog" aria-labelledby="decision-dialog-title" aria-describedby="decision-dialog-message">
+  <div class="dialog-body">
+    <div class="decision-dialog-header">
+      <span id="decision-dialog-mark" class="decision-dialog-mark" aria-hidden="true"></span>
+      <div>
+        <p id="decision-dialog-status" class="dialog-eyebrow"></p>
+        <h2 id="decision-dialog-title">Catalogue Decision</h2>
+      </div>
+      <button id="decision-dialog-close" class="icon-button" type="button" aria-label="Close decision details">×</button>
+    </div>
+    <dl class="decision-meta">
+      <div><dt>JLC code</dt><dd id="decision-dialog-code" translate="no"></dd></div>
+      <div><dt>Manufacturer Part</dt><dd id="decision-dialog-mpn" translate="no"></dd></div>
+      <div><dt>Designators</dt><dd id="decision-dialog-designators" translate="no"></dd></div>
+    </dl>
+    <div id="decision-dialog-message-box" class="decision-message">
+      <h3>What this means</h3>
+      <p id="decision-dialog-message"></p>
+    </div>
+    <div class="dialog-actions">
+      <button id="decision-dialog-done" type="button">Done</button>
+    </div>
+  </div>
+</dialog>
 <script>
 (() => {
   const file = document.getElementById('file');
@@ -246,10 +296,22 @@
   const applyDialogMessage = document.getElementById('apply-dialog-message');
   const applyDialogCancel = document.getElementById('apply-dialog-cancel');
   const applyDialogConfirm = document.getElementById('apply-dialog-confirm');
+  const decisionDialog = document.getElementById('decision-dialog');
+  const decisionDialogMark = document.getElementById('decision-dialog-mark');
+  const decisionDialogStatus = document.getElementById('decision-dialog-status');
+  const decisionDialogCode = document.getElementById('decision-dialog-code');
+  const decisionDialogMpn = document.getElementById('decision-dialog-mpn');
+  const decisionDialogDesignators = document.getElementById('decision-dialog-designators');
+  const decisionDialogMessage = document.getElementById('decision-dialog-message');
+  const decisionDialogMessageBox = document.getElementById('decision-dialog-message-box');
+  const decisionDialogClose = document.getElementById('decision-dialog-close');
+  const decisionDialogDone = document.getElementById('decision-dialog-done');
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  const quantityFormatter = new Intl.NumberFormat(navigator.languages);
   let current = null;
   let draftKey = null;
   let busy = false;
+  let decisionReturnFocus = null;
 
   file.addEventListener('change', () => {
     fileName.textContent = file.files[0]?.name || 'CSV, XLSX, XLSM, or TXT';
@@ -321,6 +383,66 @@
   }
   function cell(tr, value) {
     const td = document.createElement('td'); td.textContent = value || '—'; tr.appendChild(td); return td;
+  }
+  function decisionDetails(status) {
+    return {
+      ready: {kind:'info', label:'Ready'},
+      complete: {kind:'success', label:'Complete'},
+      review: {kind:'warning', label:'Needs Review'},
+      blocked: {kind:'error', label:'Blocked'},
+    }[status] || {kind:'info', label:'Information'};
+  }
+  function decisionIcon(kind) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('decision-icon'); svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', kind === 'warning' ? 'path' : 'circle');
+    if (kind === 'warning') shape.setAttribute('d', 'M10.3 3.7 2.4 17.4A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.6L13.7 3.7a2 2 0 0 0-3.4 0Z');
+    else { shape.setAttribute('cx', '12'); shape.setAttribute('cy', '12'); shape.setAttribute('r', '9'); }
+    svg.appendChild(shape);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', kind === 'success' ? 'm8 12 2.6 2.6L16.5 9'
+      : kind === 'error' ? 'm9 9 6 6m0-6-6 6'
+      : kind === 'warning' ? 'M12 9v4m0 3h.01'
+      : 'M12 11v5m0-8h.01');
+    svg.appendChild(path); return svg;
+  }
+  function openDecision(item, trigger) {
+    const details = decisionDetails(item.status);
+    decisionReturnFocus = trigger;
+    decisionDialogMark.className = `decision-dialog-mark ${details.kind}`;
+    decisionDialogMark.replaceChildren(decisionIcon(details.kind));
+    decisionDialogStatus.textContent = details.label;
+    document.getElementById('decision-dialog-title').textContent = `${details.label} Catalogue Decision`;
+    decisionDialogCode.textContent = item.row.jlcpcb_part || '—';
+    decisionDialogMpn.textContent = item.product?.mpn || '—';
+    decisionDialogDesignators.textContent = item.row.designators || '—';
+    decisionDialogMessage.textContent = item.reason || 'No additional action is required.';
+    decisionDialogMessageBox.className = `decision-message ${details.kind}`;
+    decisionDialog.showModal();
+    decisionDialogDone.focus({preventScroll:true});
+  }
+  function closeDecision() {
+    if (decisionDialog.open) decisionDialog.close();
+  }
+  decisionDialogClose.addEventListener('click', closeDecision);
+  decisionDialogDone.addEventListener('click', closeDecision);
+  decisionDialog.addEventListener('close', () => {
+    if (decisionReturnFocus instanceof HTMLElement) decisionReturnFocus.focus({preventScroll:true});
+    decisionReturnFocus = null;
+  });
+  function decisionCell(tr, item) {
+    const details = decisionDetails(item.status);
+    const td = document.createElement('td'); td.className = 'decision-cell';
+    const button = document.createElement('button'); button.type = 'button';
+    button.className = `decision-trigger ${details.kind}`;
+    button.setAttribute('aria-label', `View ${details.label} decision for ${item.row.jlcpcb_part}`);
+    const label = document.createElement('span'); label.textContent = details.label;
+    button.append(decisionIcon(details.kind), label);
+    button.addEventListener('click', () => openDecision(item, button));
+    td.appendChild(button); tr.appendChild(td); return td;
   }
   function copyCell(tr, value, label) {
     if (!value) return cell(tr, value);
@@ -481,13 +603,14 @@
     tr.appendChild(td);
   }
   function sourceControls(tr, item) {
-    const td = document.createElement('td');
+    const td = document.createElement('td'); td.className = 'consigned-cell';
     const quantity = Number(item.consigned_quantity || 0);
-    if (quantity > 0) {
-      td.textContent = `Consigned: ${quantity.toLocaleString()} on hand (JLC API)`;
-    } else {
-      td.textContent = 'Ordinary JLC catalogue: 0 consigned units (JLC API)';
-    }
+    const value = document.createElement('span');
+    value.className = `consigned-value ${quantity > 0 ? 'yes' : 'no'}`;
+    value.textContent = quantity > 0 ? `Yes (${quantityFormatter.format(quantity)})` : 'No';
+    value.setAttribute('aria-label', quantity > 0
+      ? `Consigned, ${quantityFormatter.format(quantity)} units on hand` : 'Not consigned');
+    td.appendChild(value);
     tr.appendChild(td);
   }
   function internalPartCell(tr, part) {
@@ -627,7 +750,6 @@
     for (const item of data.rows) {
       const tr = document.createElement('tr'); tr.dataset.row = item.row.row;
       tr.dataset.saved = item.status === 'complete' ? 'true' : 'false';
-      cell(tr, item.row.designators);
       cell(tr, item.row.jlcpcb_part);
       const sheetCell = copyCell(tr, item.row.footprint, 'Sheet Footprint / MPN');
       const mpnWrap = document.createElement('div'); mpnWrap.className = 'sheet-mpn-field';
@@ -650,18 +772,10 @@
         source.href = item.product.url; source.target = '_blank'; source.rel = 'noopener noreferrer';
         source.textContent = 'Open JLCPCB page ↗'; jlcCell.appendChild(source);
       }
-      const makerCell = cell(tr, item.product?.manufacturer);
-      if (item.product?.source) {
-        const note = document.createElement('small'); note.className = 'source-note';
-        note.textContent = item.product.source === 'api' ?
-          (item.product.description ? 'JLC API' : 'JLC API; description unavailable') :
-          item.product.source === 'api+page' ? 'JLC API; missing fields from page' : 'JLC page fallback';
-        makerCell.appendChild(note);
-      }
+      cell(tr, item.product?.manufacturer);
       packageControls(tr, item);
       sourceControls(tr, item);
-      const status = cell(tr, `${item.status}: ${item.reason}`); status.classList.add('status', item.status);
-      status.title = item.product?.description || '';
+      decisionCell(tr, item);
       manufacturerControls(tr, item);
       if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item.row.row);
       else internalPartCell(tr, item.part);

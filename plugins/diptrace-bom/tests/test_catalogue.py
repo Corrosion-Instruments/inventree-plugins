@@ -310,9 +310,32 @@ class CatalogueTests(unittest.TestCase):
     def test_jlc_balance_source_is_automatic_in_the_ui(self):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
         template = page.read_text(encoding="utf-8")
-        self.assertIn("Ordinary JLC catalogue: 0 consigned units (JLC API)", template)
+        self.assertIn("`Yes (${quantityFormatter.format(quantity)})`", template)
+        self.assertIn(": 'No'", template)
+        self.assertIn("new Intl.NumberFormat(navigator.languages)", template)
         self.assertNotIn("source-select", template)
         self.assertNotIn("check-source", template)
+
+    def test_catalogue_table_uses_compact_decision_dialog(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertNotIn("<th>Designators</th>", template)
+        self.assertIn('<dialog id="decision-dialog"', template)
+        self.assertIn('aria-labelledby="decision-dialog-title"', template)
+        self.assertIn('aria-describedby="decision-dialog-message"', template)
+        self.assertIn("function decisionCell(tr, item)", template)
+        self.assertIn("button.className = `decision-trigger ${details.kind}`", template)
+        self.assertIn("decisionDialog.addEventListener('close'", template)
+        self.assertIn("decisionReturnFocus.focus({preventScroll:true})", template)
+        self.assertIn("svg.setAttribute('aria-hidden', 'true')", template)
+        self.assertNotIn("`${item.status}: ${item.reason}`", template)
+
+    def test_jlc_manufacturer_column_omits_source_noise(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertNotIn("JLC API; description unavailable", template)
+        self.assertNotIn("JLC API; missing fields from page", template)
+        self.assertNotIn("JLC page fallback", template)
 
     def test_catalogue_uses_compact_toast_notifications(self):
         templates = (Path(__file__).resolve().parents[1]
