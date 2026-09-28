@@ -281,6 +281,20 @@ class CatalogueTests(unittest.TestCase):
         self.assertNotIn("source-select", template)
         self.assertNotIn("check-source", template)
 
+    def test_catalogue_uses_compact_toast_notifications(self):
+        templates = (Path(__file__).resolve().parents[1]
+                     / "inventree_diptrace_bom/templates/inventree_diptrace_bom")
+        catalogue = (templates / "catalogue.html").read_text(encoding="utf-8")
+        importer = (templates / "import.html").read_text(encoding="utf-8")
+        for page in (catalogue, importer):
+            self.assertIn('id="toast-region"', page)
+            self.assertIn("function notify(", page)
+            self.assertIn(".toast.success .toast-mark", page)
+            self.assertIn(".toast.error .toast-mark", page)
+        self.assertNotIn('id="message"', catalogue)
+        self.assertIn("function resultNotice(", catalogue)
+        self.assertNotIn("0 Parts, 0 categories", catalogue)
+
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")
