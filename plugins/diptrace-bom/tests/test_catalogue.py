@@ -11,6 +11,7 @@ from inventree_diptrace_bom.catalogue import (
     JlcPageClient,
     JlcPart,
     apply_sheet_mpn_overrides,
+    category_suggestion,
     _company_metadata,
     _conflicting_codes,
     _is_jlcpcb_name,
@@ -122,6 +123,43 @@ class CatalogueTests(unittest.TestCase):
         part = CatalogueImportService(client=PageClient())._fetch_product("C49420596", record)
         self.assertEqual(part.manufacturer, "TXGA(特思嘉)")
         self.assertEqual(part.source, "api")
+
+    def test_api_category_fields_are_kept_for_catalogue_suggestions(self):
+        class PageClient:
+            def fetch(self, code):
+                raise AssertionError("A complete API record must not fetch HTML")
+
+        record = {"componentCode": "C844249", "componentModel": "CRCW25121M00FKEG",
+                  "componentBrandEn": "Vishay Intertech", "componentSpecification": "2512",
+                  "firstTypeName": "Resistors", "secondTypeName": "Chip Resistor - Surface Mount"}
+        part = CatalogueImportService(client=PageClient())._fetch_product("C844249", record)
+        self.assertEqual(part.category, "Resistors")
+        self.assertEqual(part.subcategory, "Chip Resistor - Surface Mount")
+
+    def test_api_category_selects_existing_or_prefills_a_new_family(self):
+        categories = [
+            {"pk": 86, "name": "Electronic Components", "path": "Electronic Components", "structural": False},
+            {"pk": 87, "name": "Diodes", "path": "Electronic Components/Diodes", "structural": False},
+            {"pk": 88, "name": "Resistors", "path": "Resistors", "structural": False},
+            {"pk": 79, "name": "Electronic modules", "path": "Electronic modules", "structural": False},
+            {"pk": 999, "name": "Archive", "path": "Archive", "structural": True},
+        ]
+        resistor = JlcPart("C844249", "Vishay", "MPN", "", "2512", "https://example.test",
+                           category="Resistors", subcategory="Chip Resistor - Surface Mount")
+        self.assertEqual(category_suggestion(resistor, categories)["existing_id"], 88)
+        tvs = JlcPart("C1973675", "ST", "SM6T22CA", "", "SMB", "https://example.test",
+                      category="Circuit Protection", subcategory="ESD And Surge Protection (TVS/ESD)")
+        self.assertEqual(category_suggestion(tvs, categories)["existing_id"], 87)
+        module = JlcPart("C3", "Maker", "Module", "", "SMD", "https://example.test",
+                         category="Electronic Modules", subcategory="Wireless Modules")
+        self.assertEqual(category_suggestion(module, categories)["existing_id"], 79)
+        sensor = JlcPart("C1", "Maker", "Sensor", "", "SMD", "https://example.test",
+                         category="Sensors", subcategory="Temperature Sensors")
+        suggestion = category_suggestion(sensor, categories)
+        self.assertEqual(suggestion["existing_id"], "")
+        self.assertEqual(suggestion["new_name"], "Sensors")
+        missing = JlcPart("C2", "Maker", "Part", "", "SMD", "https://example.test")
+        self.assertEqual(category_suggestion(missing, categories)["new_name"], "")
 
     def test_missing_api_description_is_left_blank_without_page_fetch(self):
         class PageClient:
@@ -470,6 +508,15 @@ class CatalogueTests(unittest.TestCase):
             self.assertIn(token, catalogue)
         self.assertIn('class="file-control"', catalogue)
         self.assertIn('class="table-wrap"', catalogue)
+
+    def test_catalogue_category_controls_apply_api_suggestions(self):
+        page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
+        template = page.read_text(encoding="utf-8")
+        self.assertIn("function categoryControls(tr, item)", template)
+        self.assertIn("const suggestion = item.category_suggestion || {}", template)
+        self.assertIn("existing.value = String(suggestion.existing_id)", template)
+        self.assertIn("newName.value = suggestion.new_name", template)
+        self.assertIn("const hasSavedCategory = Boolean", template)
 
     def test_optional_sheet_part_link_accepts_only_web_urls(self):
         self.assertEqual(validate_external_link(None), "")

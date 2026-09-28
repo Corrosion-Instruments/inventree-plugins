@@ -497,7 +497,8 @@
     fieldLabel.htmlFor = input.id;
     wrap.append(fieldLabel, input); td.appendChild(wrap);
   }
-  function categoryControls(tr, rowNumber) {
+  function categoryControls(tr, item) {
+    const rowNumber = item.row.row;
     const td = document.createElement('td');
     const wrap = document.createElement('div'); wrap.className = 'category'; wrap.dataset.row = rowNumber;
     const existing = document.createElement('select'); existing.className = 'existing';
@@ -514,6 +515,15 @@
     const newName = document.createElement('input'); newName.type = 'text'; newName.maxLength = 100;
     newName.className = 'new-name'; newName.placeholder = 'Or create category name';
     newName.setAttribute('aria-label', `New category name for row ${rowNumber}`);
+    const suggestion = item.category_suggestion || {};
+    if (suggestion.existing_id && [...existing.options].some(entry => entry.value === String(suggestion.existing_id))) {
+      existing.value = String(suggestion.existing_id);
+    } else if (suggestion.new_name) {
+      newName.value = suggestion.new_name;
+    }
+    if (suggestion.parent_id && [...parent.options].some(entry => entry.value === String(suggestion.parent_id))) {
+      parent.value = String(suggestion.parent_id);
+    }
     existing.addEventListener('change', () => { if (existing.value) newName.value = ''; });
     newName.addEventListener('input', () => { if (newName.value.trim()) existing.value = ''; });
     wrap.append(existing, newName, parent);
@@ -716,19 +726,22 @@
     const category = tr.querySelector('.category');
     if (category && choice.category) {
       const saved = choice.category;
-      let existingId = saved.existing_id || '';
-      let newName = saved.new_name || '';
-      if (newName) {
-        const found = current.categories.find(item => !item.structural
-          && item.name.toLocaleLowerCase() === newName.toLocaleLowerCase()
-          && String(item.parent_id || '') === String(saved.parent_id || ''));
-        if (found) { existingId = String(found.pk); newName = ''; }
+      const hasSavedCategory = Boolean(saved.existing_id || saved.new_name || saved.parent_id);
+      if (hasSavedCategory) {
+        let existingId = saved.existing_id || '';
+        let newName = saved.new_name || '';
+        if (newName) {
+          const found = current.categories.find(item => !item.structural
+            && item.name.toLocaleLowerCase() === newName.toLocaleLowerCase()
+            && String(item.parent_id || '') === String(saved.parent_id || ''));
+          if (found) { existingId = String(found.pk); newName = ''; }
+        }
+        const existing = category.querySelector('.existing');
+        if ([...existing.options].some(option => option.value === String(existingId))) existing.value = existingId;
+        category.querySelector('.new-name').value = newName;
+        const parent = category.querySelector('.parent');
+        if ([...parent.options].some(option => option.value === String(saved.parent_id || ''))) parent.value = saved.parent_id || '';
       }
-      const existing = category.querySelector('.existing');
-      if ([...existing.options].some(option => option.value === String(existingId))) existing.value = existingId;
-      category.querySelector('.new-name').value = newName;
-      const parent = category.querySelector('.parent');
-      if ([...parent.options].some(option => option.value === String(saved.parent_id || ''))) parent.value = saved.parent_id || '';
     }
     const manufacturer = tr.querySelector('.manufacturer-choice');
     if (manufacturer && choice.manufacturer) {
@@ -787,7 +800,7 @@
       sourceControls(tr, item);
       decisionCell(tr, item);
       manufacturerControls(tr, item);
-      if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item.row.row);
+      if (item.needs_category && (item.status === 'ready' || item.status === 'review')) categoryControls(tr, item);
       else internalPartCell(tr, item.part);
       const action = document.createElement('td'); action.className = 'row-action';
       if (item.status === 'ready' || item.status === 'review') {

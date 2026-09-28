@@ -36,6 +36,8 @@ class JlcPart:
     manufacturer_description: str = ""
     manufacturer_website: str = ""
     source: str = "page"
+    category: str = ""
+    subcategory: str = ""
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -44,6 +46,81 @@ class JlcPart:
 def normalize_identifier(value: str) -> str:
     """Ignore only casing and incidental whitespace, not suffixes or punctuation."""
     return " ".join(str(value or "").split()).casefold()
+
+
+def _category_words(value: str) -> set[str]:
+    """Return comparable category words with conservative singular handling."""
+    words = set(re.findall(r"[a-z0-9]+", str(value or "").casefold()))
+    expanded = set(words)
+    for word in words:
+        if len(word) > 4 and word.endswith("ies"):
+            expanded.add(f"{word[:-3]}y")
+        elif len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+            expanded.add(word[:-1])
+    return expanded
+
+
+CATEGORY_FAMILY_RULES = (
+    (re.compile(r"\b(resistors?|potentiometers?)\b", re.I), ("resistor",)),
+    (re.compile(r"\bcapacitors?\b", re.I), ("capacitor",)),
+    (re.compile(r"\b(connectors?|terminal blocks?)\b", re.I), ("connector",)),
+    (re.compile(r"\b(batter(?:y|ies)|battery holders?)\b", re.I), ("battery",)),
+    (re.compile(r"\b(cables?|wires?|wire harness(?:es)?)\b", re.I), ("cable",)),
+    (re.compile(r"\b(antennas?)\b", re.I), ("antenna",)),
+    (re.compile(r"\b(enclosures?|housings?)\b", re.I), ("enclosure",)),
+    (re.compile(r"\b(fasteners?|screws?|nuts?|washers?)\b", re.I), ("fastner", "fastener")),
+    (re.compile(r"\b(memory|memories|dram|sram|eeprom|flash)\b", re.I), ("memory",)),
+    (re.compile(r"\b(power management|pmic)\b", re.I), ("power", "management", "pmic")),
+    (re.compile(r"\b(data converters?|analog.to.digital|digital.to.analog|adcs?|dacs?)\b", re.I), ("converter",)),
+    (re.compile(r"\b(diodes?|rectifiers?|tvs|esd and surge protection)\b", re.I), ("diode",)),
+    (re.compile(r"\b(amplifiers?|comparators?|microcontrollers?|processors?|logic|integrated circuits?|ics?)\b", re.I),
+     ("integrated", "circuit", "ic")),
+    (re.compile(r"\b(electronic modules?|modules?)\b", re.I), ("electronic", "module")),
+    (re.compile(r"\b(mechanicals?|mechanical components?)\b", re.I), ("mechanical",)),
+    (re.compile(r"\b(printed circuit boards?|pcbs?)\b", re.I), ("pcb",)),
+)
+
+
+def category_suggestion(product: JlcPart, categories: list[dict]) -> dict:
+    """Suggest an existing broad IMS category from JLC's API category names.
+
+    Exact broad-category matches win. Regex family rules cover safe naming
+    differences such as ``Circuit Protection / TVS`` to the IMS diode family.
+    Unknown JLC families are prefilled for review instead of being guessed.
+    """
+    primary = " ".join(str(product.category or "").split())
+    secondary = " ".join(str(product.subcategory or "").split())
+    source = " / ".join(value for value in (primary, secondary) if value)
+    usable = [category for category in categories if not category.get("structural")]
+
+    primary_words = _category_words(primary)
+    if primary_words:
+        exact = [category for category in usable
+                 if _category_words(category.get("name", "")) == primary_words]
+        if len(exact) == 1:
+            return {"source": source, "existing_id": exact[0]["pk"],
+                    "new_name": "", "parent_id": "", "matched": True}
+
+    for pattern, target_words in CATEGORY_FAMILY_RULES:
+        if not pattern.search(source):
+            continue
+        targets = set(target_words)
+        matches = [category for category in usable
+                   if targets & _category_words(category.get("path", ""))]
+        if matches:
+            # Prefer the family with the most matching terms, then the most
+            # specific path, e.g. Electronic Components/Diodes.
+            selected = max(matches, key=lambda category: (
+                len(targets & _category_words(category.get("path", ""))),
+                len(str(category.get("path", ""))),
+            ))
+            return {"source": source, "existing_id": selected["pk"],
+                    "new_name": "", "parent_id": "", "matched": True}
+
+    generic = {"global sourcing parts", "jlcpcb parts", "other", "others"}
+    new_name = primary[:100] if primary.casefold() not in generic else ""
+    return {"source": source, "existing_id": "", "new_name": new_name,
+            "parent_id": "", "matched": False}
 
 
 def reviewed_sheet_mpn(row: dict) -> str:
@@ -248,6 +325,8 @@ class CatalogueImportService:
         mpn = str(record.get("componentModel") or "").strip()
         package = str(record.get("componentSpecification") or "").strip()
         description = str(record.get("description") or "").strip()
+        category = str(record.get("firstTypeName") or "").strip()
+        subcategory = str(record.get("secondTypeName") or "").strip()
         if not all((manufacturer, mpn, package)):
             page = self.client.fetch(code)
             if mpn and normalize_identifier(mpn) != normalize_identifier(page.mpn):
@@ -263,7 +342,8 @@ class CatalogueImportService:
             source = "api"
         return JlcPart(code=code, manufacturer=manufacturer, mpn=mpn,
                        description=description, package=package,
-                       url=f"https://jlcpcb.com/partdetail/{code}", source=source)
+                       url=f"https://jlcpcb.com/partdetail/{code}", source=source,
+                       category=category, subcategory=subcategory)
 
     def preview(self, rows: list[dict], source_choices: dict | None = None) -> dict:
         from company.models import Company, ManufacturerPart
@@ -349,6 +429,12 @@ class CatalogueImportService:
              "parent_id": category.parent_id, "structural": category.structural}
             for category in PartCategory.objects.all().order_by("name")
         ]
+        for item in results:
+            item["category_suggestion"] = None
+            if item["needs_category"] and item["product"]:
+                item["category_suggestion"] = category_suggestion(
+                    JlcPart(**item["product"]), categories
+                )
         part_ids = {
             part["pk"]
             for item in results
