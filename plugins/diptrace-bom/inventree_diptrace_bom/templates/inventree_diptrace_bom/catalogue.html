@@ -401,19 +401,26 @@
       groups.get(key).records.push(record);
     }
     for (const group of groups.values()) {
-      const partLink = document.createElement('a'); partLink.className = 'part-link';
-      partLink.href = `/web/part/${encodeURIComponent(group.part.pk)}/`;
-      partLink.target = '_blank'; partLink.rel = 'noopener noreferrer';
-      partLink.textContent = `${group.part.name} ↗`;
-      partLink.setAttribute('aria-label', `Open InvenTree Part ${group.part.name}`);
-      const list = document.createElement('ul');
-      for (const record of group.records) {
-        const entry = document.createElement('li');
-        entry.textContent = `${record.manufacturer} — ${record.mpn}`;
-        list.appendChild(entry);
+      if (group.records.length) {
+        const list = document.createElement('ul');
+        for (const record of group.records) {
+          const entry = document.createElement('li');
+          const link = document.createElement('a'); link.className = 'part-link';
+          link.href = `/web/part/${encodeURIComponent(record.part.pk)}/`;
+          link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = `${record.manufacturer} — ${record.mpn} ↗`;
+          link.setAttribute('aria-label', `Open internal Part ${record.part.name} for ${record.manufacturer} ${record.mpn}`);
+          entry.appendChild(link); list.appendChild(entry);
+        }
+        wrap.appendChild(list);
+      } else {
+        const partLink = document.createElement('a'); partLink.className = 'part-link';
+        partLink.href = `/web/part/${encodeURIComponent(group.part.pk)}/`;
+        partLink.target = '_blank'; partLink.rel = 'noopener noreferrer';
+        partLink.textContent = `${group.part.name} ↗`;
+        partLink.setAttribute('aria-label', `Open InvenTree Part ${group.part.name}`);
+        wrap.appendChild(partLink);
       }
-      wrap.appendChild(partLink);
-      if (group.records.length) wrap.appendChild(list);
     }
     td.appendChild(wrap);
     return true;

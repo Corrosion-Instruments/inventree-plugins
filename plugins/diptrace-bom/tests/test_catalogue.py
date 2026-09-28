@@ -365,8 +365,9 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("heading.textContent = 'Linked internal Parts:'", template)
         self.assertIn("for (const part of linkedParts)", template)
         self.assertIn("groups.set(key, {part: record.part, records: []})", template)
-        self.assertIn("partLink.textContent = `${group.part.name} ↗`", template)
-        self.assertIn("partLink.target = '_blank'", template)
+        self.assertIn("`/web/part/${encodeURIComponent(record.part.pk)}/`", template)
+        self.assertIn("`${record.manufacturer} — ${record.mpn} ↗`", template)
+        self.assertIn("link.target = '_blank'", template)
 
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]
