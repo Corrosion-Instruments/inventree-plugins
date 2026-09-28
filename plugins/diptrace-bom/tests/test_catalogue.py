@@ -65,12 +65,12 @@ class CatalogueTests(unittest.TestCase):
         self.assertIsNone(compare_row({"footprint": "crha2512af100mfkef"}, part))
         self.assertIn("differs", compare_row({"footprint": "wrong part"}, part))
 
-    def test_consignment_balance_is_positive_evidence_not_a_zero_balance_type(self):
+    def test_consignment_balance_decides_catalogue_or_consigned_source(self):
         self.assertEqual(consignment_source("1236"), "consigned")
         self.assertEqual(consignment_source("1236", "catalogue"), "consigned")
-        self.assertEqual(consignment_source("0"), "unknown")
+        self.assertEqual(consignment_source("0"), "catalogue")
         self.assertEqual(consignment_source("0", "catalogue"), "catalogue")
-        self.assertEqual(consignment_source("0", "consigned"), "consigned")
+        self.assertEqual(consignment_source("0", "consigned"), "catalogue")
         with self.assertRaisesRegex(CatalogueError, "Invalid JLCPCB source choice"):
             consignment_source("0", "global")
 
@@ -274,13 +274,12 @@ class CatalogueTests(unittest.TestCase):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
         self.assertIn(".confirmation[hidden] { display: none; }", page.read_text(encoding="utf-8"))
 
-    def test_automatic_consigned_source_does_not_disable_row_save(self):
+    def test_jlc_balance_source_is_automatic_in_the_ui(self):
         page = Path(__file__).resolve().parents[1] / "inventree_diptrace_bom/templates/inventree_diptrace_bom/catalogue.html"
         template = page.read_text(encoding="utf-8")
-        self.assertIn("const source = tr.querySelector('.source-select');", template)
-        self.assertIn("const sourceChanged = source", template)
-        self.assertIn(": false;", template)
-        self.assertNotIn("(tr.querySelector('.source-select')?.value || '') !==", template)
+        self.assertIn("Ordinary JLC catalogue: 0 consigned units (JLC API)", template)
+        self.assertNotIn("source-select", template)
+        self.assertNotIn("check-source", template)
 
     def test_importers_share_header_navigation_and_design_tokens(self):
         templates = (Path(__file__).resolve().parents[1]

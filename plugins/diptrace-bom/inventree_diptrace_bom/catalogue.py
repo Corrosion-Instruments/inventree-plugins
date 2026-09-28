@@ -144,12 +144,12 @@ def compare_row(row: dict, product: JlcPart) -> str | None:
 
 
 def consignment_source(quantity: str, chosen_source: str | None = None) -> str:
-    """A positive balance proves consigned stock; zero needs an explicit choice."""
+    """Classify the part from the JLC private-library consigned balance."""
     if chosen_source not in (None, "catalogue", "consigned"):
         raise CatalogueError("Invalid JLCPCB source choice")
     if Decimal(quantity) > 0:
         return "consigned"
-    return chosen_source or "unknown"
+    return "catalogue"
 
 
 class CatalogueImportService:
@@ -279,11 +279,8 @@ class CatalogueImportService:
                     product = replace(product, **metadata)
                     result["product"] = product.as_dict()
                     mismatch = compare_row(row, product)
-                    positive_consignment = Decimal(result["consigned_quantity"]) > 0
-                    chosen_source = source_choices.get(str(row["row"]))
-                    source_mode = consignment_source(result["consigned_quantity"], chosen_source)
+                    source_mode = consignment_source(result["consigned_quantity"])
                     result["source_mode"] = source_mode
-                    result["needs_source_choice"] = bool(mismatch and not positive_consignment)
                     if source_mode == "consigned" and len(reviewed_sheet_mpn(row)) > 100:
                         result["reason"] = "Spreadsheet MPN exceeds 100 characters; edit it and check again"
                     elif source_mode == "consigned" and not reviewed_sheet_mpn(row):
@@ -292,13 +289,8 @@ class CatalogueImportService:
                         result.update(self._plan_product(product))
                         needs_sheet = bool(mismatch and source_mode == "consigned")
                         result["needs_sheet_manufacturer"] = needs_sheet
-                        if result["needs_source_choice"] and source_mode == "unknown" and result["status"] != "blocked":
-                            result.update(status="review", reason=(
-                                "JLC reports zero consigned units. That does not prove this is an ordinary catalogue part; "
-                                "choose its source and check again."
-                            ))
-                        elif mismatch and source_mode == "catalogue" and result["status"] != "blocked":
-                            result["reason"] = "Ordinary JLC catalogue part selected; spreadsheet MPN is not imported"
+                        if mismatch and source_mode == "catalogue" and result["status"] != "blocked":
+                            result["reason"] = "Ordinary JLC catalogue part; spreadsheet MPN is not imported"
                         if needs_sheet and result["part"] and result["status"] == "complete":
                             # A previous import may already have attached the interchangeable
                             # sheet MPN to this same Part. Do not demand approval again.
@@ -470,9 +462,6 @@ class CatalogueImportService:
                     continue
                 if item["source_mode"] != reviewed_source_modes.get(row_key):
                     output["skipped"].append({"code": code, "reason": "JLCPCB consignment source changed since preview; check this row again"})
-                    continue
-                if item["needs_source_choice"] and item["source_mode"] == "unknown":
-                    output["skipped"].append({"code": code, "reason": "Choose ordinary JLC catalogue or consigned for this zero-balance part, then check again"})
                     continue
                 product = JlcPart(**item["product"])
                 if normalize_identifier(reviewed_mpns.get(row_key)) != normalize_identifier(product.mpn):
