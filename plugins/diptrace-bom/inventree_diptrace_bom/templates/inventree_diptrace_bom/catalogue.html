@@ -406,10 +406,10 @@
         for (const record of group.records) {
           const entry = document.createElement('li');
           const link = document.createElement('a'); link.className = 'part-link';
-          link.href = `/web/part/${encodeURIComponent(record.part.pk)}/`;
+          link.href = `/web/purchasing/manufacturer-part/${encodeURIComponent(record.pk)}/`;
           link.target = '_blank'; link.rel = 'noopener noreferrer';
           link.textContent = `${record.manufacturer} — ${record.mpn} ↗`;
-          link.setAttribute('aria-label', `Open internal Part ${record.part.name} for ${record.manufacturer} ${record.mpn}`);
+          link.setAttribute('aria-label', `Open Manufacturer Part ${record.manufacturer} ${record.mpn}`);
           entry.appendChild(link); list.appendChild(entry);
         }
         wrap.appendChild(list);

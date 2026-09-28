@@ -73,6 +73,7 @@ def group_manufacturer_parts(records) -> dict[int, list[dict]]:
     grouped: dict[int, list[dict]] = {}
     for record in records:
         grouped.setdefault(record.part_id, []).append({
+            "pk": record.pk,
             "mpn": record.MPN,
             "manufacturer": record.manufacturer.name,
             "part": {"pk": record.part_id, "name": record.part.name},

@@ -203,25 +203,25 @@ class CatalogueTests(unittest.TestCase):
 
     def test_saved_manufacturer_parts_group_under_one_internal_part(self):
         records = [
-            types.SimpleNamespace(part_id=1939, MPN="0402CG101J500NT",
+            types.SimpleNamespace(pk=31, part_id=1939, MPN="0402CG101J500NT",
                                   part=types.SimpleNamespace(name="0402CG101J500NT"),
                                   manufacturer=types.SimpleNamespace(name="FH (Guangdong Fenghua Advanced Tech)")),
-            types.SimpleNamespace(part_id=1939, MPN="CC0402JRNPO9BN101",
+            types.SimpleNamespace(pk=32, part_id=1939, MPN="CC0402JRNPO9BN101",
                                   part=types.SimpleNamespace(name="0402CG101J500NT"),
                                   manufacturer=types.SimpleNamespace(name="Yageo")),
         ]
         self.assertEqual(group_manufacturer_parts(records), {1939: [
-            {"mpn": "0402CG101J500NT", "manufacturer": "FH (Guangdong Fenghua Advanced Tech)",
+            {"pk": 31, "mpn": "0402CG101J500NT", "manufacturer": "FH (Guangdong Fenghua Advanced Tech)",
              "part": {"pk": 1939, "name": "0402CG101J500NT"}},
-            {"mpn": "CC0402JRNPO9BN101", "manufacturer": "Yageo",
+            {"pk": 32, "mpn": "CC0402JRNPO9BN101", "manufacturer": "Yageo",
              "part": {"pk": 1939, "name": "0402CG101J500NT"}},
         ]})
 
     def test_saved_manufacturer_parts_keep_distinct_internal_parts(self):
         records = [
-            types.SimpleNamespace(part_id=10, MPN="MPN-A", part=types.SimpleNamespace(name="Part A"),
+            types.SimpleNamespace(pk=1, part_id=10, MPN="MPN-A", part=types.SimpleNamespace(name="Part A"),
                                   manufacturer=types.SimpleNamespace(name="Maker A")),
-            types.SimpleNamespace(part_id=20, MPN="MPN-B", part=types.SimpleNamespace(name="Part B"),
+            types.SimpleNamespace(pk=2, part_id=20, MPN="MPN-B", part=types.SimpleNamespace(name="Part B"),
                                   manufacturer=types.SimpleNamespace(name="Maker B")),
         ]
         grouped = group_manufacturer_parts(records)
@@ -365,7 +365,7 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("heading.textContent = 'Linked internal Parts:'", template)
         self.assertIn("for (const part of linkedParts)", template)
         self.assertIn("groups.set(key, {part: record.part, records: []})", template)
-        self.assertIn("`/web/part/${encodeURIComponent(record.part.pk)}/`", template)
+        self.assertIn("`/web/purchasing/manufacturer-part/${encodeURIComponent(record.pk)}/`", template)
         self.assertIn("`${record.manufacturer} — ${record.mpn} ↗`", template)
         self.assertIn("link.target = '_blank'", template)
 
