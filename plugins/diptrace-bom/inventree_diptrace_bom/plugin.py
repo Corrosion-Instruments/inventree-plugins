@@ -47,7 +47,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.8.0"
+    VERSION = "0.8.1"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -591,7 +591,7 @@ class DipTraceBomPlugin(
                 "key": "diptrace-bom-navigation",
                 "title": _("DipTrace BOM"),
                 "icon": "ti:list-check",
-                "options": {"url": f"plugin/{self.SLUG}/"},
+                "options": {"url": f"/plugin/{self.SLUG}/"},
             }
         ]
         if request.user.is_authenticated:
@@ -599,14 +599,14 @@ class DipTraceBomPlugin(
                 "key": "diptrace-build-planner-navigation",
                 "title": _("Build Planner"),
                 "icon": "ti:hierarchy-3",
-                "options": {"url": f"plugin/{self.SLUG}/planner/"},
+                "options": {"url": f"/plugin/{self.SLUG}/planner/"},
             })
         if request.user.is_authenticated and request.user.is_staff:
             items.append({
                 "key": "jlc-part-catalogue-navigation",
                 "title": _("JLC Part Catalogue"),
                 "icon": "ti:database-import",
-                "options": {"url": f"plugin/{self.SLUG}/catalogue/"},
+                "options": {"url": f"/plugin/{self.SLUG}/catalogue/"},
             })
         return items
 

@@ -444,8 +444,10 @@ class CatalogueTests(unittest.TestCase):
         routes = (root / "inventree_diptrace_bom/static/diptrace_bom_routes.js").read_text(
             encoding="utf-8"
         )
-        self.assertIn('"options": {"url": f"plugin/{self.SLUG}/"}', plugin)
-        self.assertIn('"options": {"url": f"plugin/{self.SLUG}/catalogue/"}', plugin)
+        self.assertIn('"options": {"url": f"/plugin/{self.SLUG}/"}', plugin)
+        self.assertIn('"options": {"url": f"/plugin/{self.SLUG}/planner/"}', plugin)
+        self.assertIn('"options": {"url": f"/plugin/{self.SLUG}/catalogue/"}', plugin)
+        self.assertNotIn('"options": {"url": f"plugin/{self.SLUG}/', plugin)
         self.assertIn("def get_ui_routes(", plugin)
         self.assertIn('"options": {"path": ""}', plugin)
         self.assertIn('"options": {"path": "catalogue/"}', plugin)
