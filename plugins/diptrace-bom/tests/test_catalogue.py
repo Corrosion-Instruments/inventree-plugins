@@ -369,6 +369,21 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn('assembly=True', plugin)
         self.assertIn('check_user_permission(request.user, Part, "add")', plugin)
 
+    def test_modern_navigation_routes_redirect_to_server_rendered_pages(self):
+        root = Path(__file__).resolve().parents[1]
+        plugin = (root / "inventree_diptrace_bom/plugin.py").read_text(encoding="utf-8")
+        routes = (root / "inventree_diptrace_bom/static/diptrace_bom_routes.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"options": {"url": f"plugin/{self.SLUG}/"}', plugin)
+        self.assertIn('"options": {"url": f"plugin/{self.SLUG}/catalogue/"}', plugin)
+        self.assertIn("def get_ui_routes(", plugin)
+        self.assertIn('"options": {"path": ""}', plugin)
+        self.assertIn('"options": {"path": "catalogue/"}', plugin)
+        self.assertIn('window.location.replace(target)', routes)
+        self.assertIn('redirectPage("/plugin/diptrace-bom/"', routes)
+        self.assertIn('redirectPage("/plugin/diptrace-bom/catalogue/"', routes)
+
     def test_catalogue_uses_compact_toast_notifications(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")

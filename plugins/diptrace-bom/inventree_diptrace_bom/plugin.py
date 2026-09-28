@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.6.13"
+    VERSION = "0.6.14"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -560,7 +560,7 @@ class DipTraceBomPlugin(
                 "key": "diptrace-bom-navigation",
                 "title": _("DipTrace BOM"),
                 "icon": "ti:list-check",
-                "options": {"url": f"/plugin/{self.SLUG}/"},
+                "options": {"url": f"plugin/{self.SLUG}/"},
             }
         ]
         if request.user.is_authenticated and request.user.is_staff:
@@ -568,9 +568,32 @@ class DipTraceBomPlugin(
                 "key": "jlc-part-catalogue-navigation",
                 "title": _("JLC Part Catalogue"),
                 "icon": "ti:database-import",
-                "options": {"url": f"/plugin/{self.SLUG}/catalogue/"},
+                "options": {"url": f"plugin/{self.SLUG}/catalogue/"},
             })
         return items
+
+    def get_ui_routes(self, request, context, **kwargs):
+        """Bridge modern InvenTree routes to the plugin's server-rendered pages."""
+        routes = [
+            {
+                "key": "diptrace-bom-route",
+                "title": _("DipTrace BOM"),
+                "source": self.plugin_static_file(
+                    "diptrace_bom_routes.js:redirectBomImporter"
+                ),
+                "options": {"path": ""},
+            }
+        ]
+        if request.user.is_authenticated and request.user.is_staff:
+            routes.append({
+                "key": "jlc-part-catalogue-route",
+                "title": _("JLC Part Catalogue"),
+                "source": self.plugin_static_file(
+                    "diptrace_bom_routes.js:redirectPartCatalogue"
+                ),
+                "options": {"path": "catalogue/"},
+            })
+        return routes
 
     def setup_urls(self):
         return [
