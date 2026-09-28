@@ -123,6 +123,9 @@
     .package-resolution .custom-package[hidden] { display:none; }
     .review-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:16px; }
     .review-actions p { margin:0; font-size:12px; }
+    .review-action-buttons { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    button.continue-bom { border-color:#1570ef; background:#1570ef; }
+    button.continue-bom:hover:not(:disabled) { border-color:#175cd3; background:#175cd3; }
     .toast-region { position:fixed; top:max(16px,env(safe-area-inset-top)); right:max(16px,env(safe-area-inset-right)); z-index:120; width:min(420px,calc(100% - 32px)); display:grid; gap:10px; pointer-events:none; }
     .toast { min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:10px; border:1px solid var(--line-soft); border-radius:8px; padding:12px; background:var(--surface); box-shadow:0 12px 32px rgba(16,24,40,.16); pointer-events:auto; transform-origin:top right; animation:toast-in .18s ease-out; }
     .toast.leaving { animation:toast-out .15s ease-in forwards; }
@@ -175,6 +178,7 @@
       .upload-row { grid-template-columns:1fr; }
       .upload-row button { justify-self:start; }
       .review-header,.review-actions { align-items:flex-start; flex-direction:column; }
+      .review-action-buttons { width:100%; }
     }
     @media(max-width:600px) {
       .nav-shell { display:block; }
@@ -184,6 +188,7 @@
       .page-shell { padding-top:20px; }
       .section-body { padding:16px; }
       .upload-row button { width:100%; }
+      .review-action-buttons button { width:100%; min-height:44px; }
       .toast-region { left:12px; right:12px; width:auto; }
       .dialog-actions { flex-direction:column-reverse; }
       .dialog-actions button { width:100%; min-height:44px; }
@@ -238,8 +243,11 @@
           <tbody id="rows"></tbody>
         </table></div>
         <div class="review-actions">
-          <button id="apply" type="button">Apply Approved Rows</button>
-          <p class="muted">Each save rechecks the row and refreshes categories and manufacturers. Reimporting the same file does not create duplicates.</p>
+          <div class="review-action-buttons">
+            <button id="apply" type="button">Apply Approved Rows</button>
+            <button id="continue-bom" class="continue-bom" type="button" aria-describedby="catalogue-workflow-status" disabled>Continue to BOM Review</button>
+          </div>
+          <p id="catalogue-workflow-status" class="muted" aria-live="polite">Resolve and save every catalogue row before continuing to the BOM review.</p>
         </div>
       </div>
     </section>
@@ -288,6 +296,8 @@
   const fileName = document.getElementById('file-name');
   const previewButton = document.getElementById('preview');
   const applyButton = document.getElementById('apply');
+  const continueBomButton = document.getElementById('continue-bom');
+  const catalogueWorkflowStatus = document.getElementById('catalogue-workflow-status');
   const review = document.getElementById('review');
   const rows = document.getElementById('rows');
   const summary = document.getElementById('summary');
@@ -806,7 +816,66 @@
       if (save) save.disabled = busy || changed || !packageReady;
     }
     applyButton.disabled = busy || pending || !rows.querySelector('.save-item');
+    updateBomHandoff();
     return pending;
+  }
+  function updateBomHandoff() {
+    const total = current?.rows?.length || 0;
+    const remaining = current?.rows?.filter(item => item.status !== 'complete').length || 0;
+    const ready = total > 0 && remaining === 0;
+    continueBomButton.disabled = busy || !ready;
+    catalogueWorkflowStatus.textContent = ready
+      ? 'All catalogue rows are saved. Continue to select the assembly and review the InvenTree BOM changes.'
+      : `${remaining || total} ${remaining === 1 ? 'row still needs' : 'rows still need'} catalogue review before BOM creation.`;
+  }
+  function stageBomFile(selected) {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error('This browser cannot transfer the reviewed BOM file'));
+        return;
+      }
+      const request = window.indexedDB.open('inventree-diptrace-bom', 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('dashboard-uploads')) {
+          request.result.createObjectStore('dashboard-uploads');
+        }
+      };
+      request.onerror = () => reject(request.error || new Error('Could not prepare the BOM review'));
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction('dashboard-uploads', 'readwrite');
+        transaction.objectStore('dashboard-uploads').put({
+          blob:selected, name:selected.name, type:selected.type,
+          lastModified:selected.lastModified, savedAt:Date.now(),
+        }, 'pending');
+        transaction.oncomplete = () => { database.close(); resolve(); };
+        transaction.onerror = () => {
+          database.close();
+          reject(transaction.error || new Error('Could not prepare the BOM review'));
+        };
+      };
+    });
+  }
+  async function continueToBomReview() {
+    const remaining = current?.rows?.filter(item => item.status !== 'complete').length || 0;
+    if (remaining) {
+      notify(`${remaining} ${remaining === 1 ? 'row still needs' : 'rows still need'} catalogue review.`, 'warning', 'Catalogue Review Incomplete');
+      return;
+    }
+    const selected = file.files[0];
+    if (!selected) return notify('Select the DipTrace BOM file again.', 'warning', 'BOM File Required');
+    continueBomButton.disabled = true;
+    continueBomButton.setAttribute('aria-busy', 'true');
+    const working = notify('Preparing the reviewed file for BOM creation…', 'info', 'Opening BOM Review', {persistent:true});
+    try {
+      await stageBomFile(selected);
+      window.location.assign('../?dashboard_upload=1&from=catalogue');
+    } catch (error) {
+      notify(error.message, 'error', 'Could Not Open BOM Review');
+      continueBomButton.disabled = false;
+      continueBomButton.removeAttribute('aria-busy');
+      dismissToast(working);
+    }
   }
   function collectPayload(rowNumber = null) {
     const categories = {}, manufacturers = {}, packages = {}, sheet_links = {};
@@ -838,7 +907,7 @@
     return responseJson(await fetch('preview/', {method: 'POST', headers: {'X-CSRFToken': csrf}, body: form}));
   }
   function setBusy(value) {
-    busy = value; previewButton.disabled = value; applyButton.disabled = value;
+    busy = value; previewButton.disabled = value; applyButton.disabled = value; continueBomButton.disabled = value;
     for (const button of rows.querySelectorAll('.save-item')) button.disabled = value;
     for (const button of rows.querySelectorAll('.check-mpn')) button.disabled = value;
     if (!value) updatePendingRows();
@@ -954,6 +1023,7 @@
     if (button) applyRows(button.closest('tr').dataset.row);
   });
   applyButton.addEventListener('click', () => applyRows());
+  continueBomButton.addEventListener('click', continueToBomReview);
 })();
 </script>
 </body>

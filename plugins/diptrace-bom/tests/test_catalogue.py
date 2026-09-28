@@ -337,6 +337,20 @@ class CatalogueTests(unittest.TestCase):
         self.assertNotIn("JLC API; missing fields from page", template)
         self.assertNotIn("JLC page fallback", template)
 
+    def test_completed_catalogue_hands_file_to_existing_bom_workflow(self):
+        templates = (Path(__file__).resolve().parents[1]
+                     / "inventree_diptrace_bom/templates/inventree_diptrace_bom")
+        catalogue = (templates / "catalogue.html").read_text(encoding="utf-8")
+        importer = (templates / "import.html").read_text(encoding="utf-8")
+        self.assertIn('id="continue-bom"', catalogue)
+        self.assertIn("item.status !== 'complete'", catalogue)
+        self.assertIn("function stageBomFile(selected)", catalogue)
+        self.assertIn("window.indexedDB.open('inventree-diptrace-bom', 1)", catalogue)
+        self.assertIn("window.location.assign('../?dashboard_upload=1&from=catalogue')", catalogue)
+        self.assertIn("const fromCatalogue = url.searchParams.get('from') === 'catalogue'", importer)
+        self.assertIn("fromCatalogue ? 'Catalogue Review Complete' : 'BOM File Ready'", importer)
+        self.assertIn("url.searchParams.delete('from')", importer)
+
     def test_catalogue_uses_compact_toast_notifications(self):
         templates = (Path(__file__).resolve().parents[1]
                      / "inventree_diptrace_bom/templates/inventree_diptrace_bom")

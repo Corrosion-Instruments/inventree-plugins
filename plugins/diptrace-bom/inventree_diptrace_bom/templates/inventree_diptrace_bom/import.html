@@ -581,6 +581,7 @@
     async function restoreDashboardUpload() {
       const url = new URL(window.location.href);
       if (url.searchParams.get('dashboard_upload') !== '1') return;
+      const fromCatalogue = url.searchParams.get('from') === 'catalogue';
 
       const databaseName = 'inventree-diptrace-bom';
       const storeName = 'dashboard-uploads';
@@ -607,9 +608,12 @@
       });
 
       url.searchParams.delete('dashboard_upload');
+      url.searchParams.delete('from');
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
       if (!record?.blob || Date.now() - Number(record.savedAt || 0) > 60 * 60 * 1000) {
-        throw new Error('The dashboard BOM selection expired. Select the file again.');
+        throw new Error(fromCatalogue
+          ? 'The reviewed catalogue file expired. Return to the catalogue importer or select the file again.'
+          : 'The dashboard BOM selection expired. Select the file again.');
       }
 
       const file = new File([record.blob], record.name || 'bom.csv', {
@@ -620,7 +624,8 @@
       transfer.items.add(file);
       el['bom-file'].files = transfer.files;
       updateSelectedFileName();
-      notify(`${file.name} is ready. Select the assembly, then preview the BOM.`, 'success', 'BOM File Ready');
+      notify(`${file.name} is ready. Select the assembly, then preview the BOM.`, 'success',
+        fromCatalogue ? 'Catalogue Review Complete' : 'BOM File Ready');
     }
     function updateSelectedFileName() {
       const file = el['bom-file'].files[0];
