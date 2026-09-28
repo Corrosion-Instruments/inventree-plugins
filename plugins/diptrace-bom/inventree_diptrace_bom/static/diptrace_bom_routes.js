@@ -30,3 +30,7 @@ export function redirectBomImporter() {
 export function redirectPartCatalogue() {
   return redirectPage("/plugin/diptrace-bom/catalogue/", "Part Catalogue");
 }
+
+export function redirectBuildPlanner() {
+  return redirectPage("/plugin/diptrace-bom/planner/", "Build Planner");
+}

@@ -516,7 +516,8 @@ class CatalogueTests(unittest.TestCase):
         importer = (templates / "import.html").read_text(encoding="utf-8")
         self.assertIn('/plugin/diptrace-bom/"', header)
         self.assertIn('/plugin/diptrace-bom/catalogue/"', header)
-        self.assertEqual(header.count('aria-current="page"'), 2)
+        self.assertIn('/plugin/diptrace-bom/planner/"', header)
+        self.assertEqual(header.count('aria-current="page"'), 3)
         include = '{% include "inventree_diptrace_bom/_header.html" %}'
         self.assertIn(include, importer)
         self.assertIn(include, catalogue)

@@ -25,6 +25,7 @@ from plugin.mixins import (
 from .catalogue import CatalogueError, CatalogueImportService, apply_sheet_mpn_overrides
 from .jlcpcb import JlcApiError, JlcClient
 from .parser import BomParseError, parse_bom
+from .planner import BuildPlannerError, BuildPlannerService
 from .services import BomImportError, BomImportService, part_summary
 from .stock_sync import JlcStockSyncError, JlcStockSyncService
 
@@ -46,7 +47,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.7.1"
+    VERSION = "0.8.0"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -54,6 +55,7 @@ class DipTraceBomPlugin(
     NAVIGATION_TAB_ICON = "fas fa-list-check"
     NAVIGATION = [
         {"name": "DipTrace BOM", "link": "plugin:diptrace-bom:index"},
+        {"name": "Build Planner", "link": "plugin:diptrace-bom:planner"},
         {"name": "JLC Part Catalogue", "link": "plugin:diptrace-bom:catalogue"},
     ]
 
@@ -161,6 +163,35 @@ class DipTraceBomPlugin(
             "active_page": "catalogue",
             "show_catalogue_nav": True,
         })
+
+    def planner_index(self, request):
+        """Plan nested builds using local stock and valid JLCPCB stock pools."""
+        if not request.user.is_authenticated:
+            return HttpResponseForbidden("Authentication required")
+        return render(request, "inventree_diptrace_bom/planner.html", {
+            "title": "Nested BOM Build Planner",
+            "csrf_token": get_token(request),
+            "initial_part": request.GET.get("part", ""),
+            "active_page": "planner",
+            "show_catalogue_nav": request.user.is_staff,
+        })
+
+    def planner_plan(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=403)
+        try:
+            data = json_request(request)
+            result = BuildPlannerService(self).plan(
+                data.get("part_id"),
+                target=data.get("target"),
+                route_overrides=data.get("route_overrides") or {},
+            )
+            return JsonResponse(result)
+        except BuildPlannerError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception:
+            logger.exception("Nested BOM planning failed")
+            return JsonResponse({"error": "Build planning failed unexpectedly"}, status=500)
 
     def _catalogue_service(self):
         credentials = BomImportService(self).jlc_credentials()
@@ -563,6 +594,13 @@ class DipTraceBomPlugin(
                 "options": {"url": f"plugin/{self.SLUG}/"},
             }
         ]
+        if request.user.is_authenticated:
+            items.append({
+                "key": "diptrace-build-planner-navigation",
+                "title": _("Build Planner"),
+                "icon": "ti:hierarchy-3",
+                "options": {"url": f"plugin/{self.SLUG}/planner/"},
+            })
         if request.user.is_authenticated and request.user.is_staff:
             items.append({
                 "key": "jlc-part-catalogue-navigation",
@@ -584,6 +622,15 @@ class DipTraceBomPlugin(
                 "options": {"path": ""},
             }
         ]
+        if request.user.is_authenticated:
+            routes.append({
+                "key": "diptrace-build-planner-route",
+                "title": _("Build Planner"),
+                "source": self.plugin_static_file(
+                    "diptrace_bom_routes.js:redirectBuildPlanner"
+                ),
+                "options": {"path": "planner/"},
+            })
         if request.user.is_authenticated and request.user.is_staff:
             routes.append({
                 "key": "jlc-part-catalogue-route",
@@ -598,6 +645,8 @@ class DipTraceBomPlugin(
     def setup_urls(self):
         return [
             path("", self.index, name="index"),
+            path("planner/", self.planner_index, name="planner"),
+            path("planner/plan/", self.planner_plan, name="planner-plan"),
             path("catalogue/", self.catalogue_index, name="catalogue"),
             path("catalogue/preview/", self.catalogue_preview, name="catalogue-preview"),
             path("catalogue/apply/", self.catalogue_apply, name="catalogue-apply"),

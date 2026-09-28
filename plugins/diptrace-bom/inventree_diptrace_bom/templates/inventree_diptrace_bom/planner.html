@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{{ title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root{color-scheme:light;--ink:#182230;--muted:#667085;--subtle:#98a2b3;--line:#d0d5dd;--line-soft:#e4e7ec;--surface:#fff;--canvas:#f6f7f9;--band:#f9fafb;--action:#171717;--action-soft:#f2f2f2;--ok:#067647;--ok-soft:#ecfdf3;--warn:#b54708;--warn-soft:#fff7ed;--danger:#b42318;--danger-soft:#fef3f2;--info:#175cd3;--info-soft:#eff8ff;--shadow:0 1px 2px rgba(16,24,40,.05)}
+    *{box-sizing:border-box}html{background:var(--canvas)}body{margin:0;min-width:320px;font-family:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--canvas)}
+    a{color:var(--action);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(0,0,0,.18);outline-offset:2px}
+    button,input,select{font:inherit}button{min-height:38px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--action);border-radius:6px;padding:0 14px;background:var(--action);color:#fff;font-size:13px;font-weight:600;cursor:pointer}button:hover:not(:disabled){background:#000}button:disabled{opacity:.55;cursor:not-allowed}button.secondary{border-color:var(--line);background:#fff;color:#344054}button.secondary:hover:not(:disabled){background:var(--band)}
+    input,select{width:100%;min-height:38px;border:1px solid var(--line);border-radius:6px;padding:0 11px;background:#fff;color:var(--ink);box-shadow:var(--shadow)}input::placeholder{color:var(--subtle)}
+    .site-header{border-bottom:1px solid var(--line-soft);background:#fff}.nav-shell,.page-shell{width:min(1520px,calc(100% - 40px));margin:0 auto}.nav-shell{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:inline-flex;align-items:center;gap:10px;color:#101828;font-size:16px;font-weight:700}.brand:hover{text-decoration:none}.brand-mark{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;background:var(--action);color:#fff;font-size:13px}.nav-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}.nav-links a{border-radius:6px;padding:8px 10px;color:#475467;font-size:14px;font-weight:500}.nav-links a:hover{background:var(--band);color:var(--ink);text-decoration:none}.nav-links a.active{background:var(--action-soft);color:var(--ink);font-weight:600}.nav-divider{width:1px;height:22px;margin:0 4px;background:var(--line-soft)}
+    .page-shell{padding:28px 0 48px}.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:22px}h1{margin:0;font-size:clamp(26px,3vw,34px);font-weight:500;line-height:1.18;letter-spacing:-.025em}h2{margin:0;font-size:17px}h3{margin:0;font-size:14px}.lead{max-width:900px;margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.55}
+    main{display:grid;gap:18px}section{min-width:0;border:1px solid var(--line-soft);border-radius:8px;background:#fff;box-shadow:var(--shadow)}.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line-soft);padding:16px 18px}.section-body{padding:18px}.setup-grid{display:grid;grid-template-columns:minmax(260px,1.5fr) minmax(170px,.5fr) auto;gap:14px;align-items:end}.field{display:grid;gap:7px;color:#344054;font-size:13px;font-weight:600}.help{color:var(--muted);font-size:12px;font-weight:400;line-height:1.45}
+    .combobox{position:relative}.options{position:absolute;top:calc(100% + 6px);right:0;left:0;z-index:10;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#fff;box-shadow:0 12px 28px rgba(16,24,40,.14)}.option{width:100%;min-height:52px;display:block;border:0;border-bottom:1px solid var(--line-soft);border-radius:0;padding:9px 11px;background:#fff;color:var(--ink);text-align:left;white-space:normal}.option:hover{background:var(--band)}.option strong,.option small{display:block}.option small{margin-top:3px;color:var(--muted);font-weight:400}.empty{padding:12px;color:var(--muted);font-size:13px}
+    .summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.metric{border:1px solid var(--line-soft);border-radius:8px;padding:16px;background:var(--band)}.metric-label{color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}.metric-value{margin-top:7px;font-size:28px;font-weight:700;line-height:1.1}.metric-detail{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.45}
+    .badge{display:inline-flex;align-items:center;min-height:28px;border:1px solid var(--line-soft);border-radius:999px;padding:0 9px;background:#f2f4f7;color:#475467;font-size:12px;font-weight:600}.badge.ok{border-color:#75e0a7;background:var(--ok-soft);color:var(--ok)}.badge.warn{border-color:#fedf89;background:var(--warn-soft);color:var(--warn)}.badge.danger{border-color:#fecdca;background:var(--danger-soft);color:var(--danger)}.badge.info{border-color:#b2ddff;background:var(--info-soft);color:var(--info)}
+    .table-wrap{overflow:auto}.data-table{width:100%;border-collapse:collapse;font-size:13px}.data-table th{padding:10px 12px;background:var(--band);color:#344054;font-size:12px;font-weight:600;text-align:left;white-space:nowrap}.data-table td{border-top:1px solid var(--line-soft);padding:11px 12px;vertical-align:middle}.data-table td.numeric,.data-table th.numeric{text-align:right;font-variant-numeric:tabular-nums}.part-link{font-weight:600;text-decoration:underline;text-underline-offset:3px}.subtext{display:block;margin-top:3px;color:var(--muted);font-size:11px}.route-select{min-width:190px}.shortage{color:var(--danger);font-weight:600}.available{color:var(--ok);font-weight:600}.muted{color:var(--muted)}
+    .notice{border-left:3px solid var(--info);border-radius:4px;padding:12px 14px;background:var(--info-soft);color:#344054;font-size:13px;line-height:1.5}.notice.warn{border-color:var(--warn);background:var(--warn-soft)}.notice-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}.hidden{display:none!important}.loading{opacity:.65;pointer-events:none}
+    .toast{position:fixed;right:20px;bottom:20px;z-index:50;max-width:min(420px,calc(100% - 40px));border:1px solid #fecdca;border-radius:8px;padding:13px 15px;background:var(--danger-soft);color:var(--danger);box-shadow:0 12px 28px rgba(16,24,40,.18);font-size:13px;line-height:1.45}
+    @media(max-width:800px){.nav-shell,.page-shell{width:min(100% - 24px,1520px)}.nav-shell{align-items:flex-start;flex-direction:column;padding:12px 0}.setup-grid,.summary-grid{grid-template-columns:1fr}.page-heading{display:block}.nav-divider{display:none}.data-table{min-width:760px}}
+  </style>
+</head>
+<body>
+  {% include "inventree_diptrace_bom/_header.html" %}
+  <div class="page-shell">
+    <div class="page-heading">
+      <div>
+        <h1>Nested BOM Build Planner</h1>
+        <p class="lead">Calculate additional finished products from the full InvenTree BOM. Completed subassemblies are used first, shared components are counted once, and incompatible JLCPCB stock pools stay separate.</p>
+      </div>
+    </div>
+    <main>
+      <section aria-labelledby="plan-heading">
+        <div class="section-head"><div><h2 id="plan-heading">Choose a finished product</h2><span class="help">The saved InvenTree BOM is the source of truth; no flattened BOM upload is required.</span></div></div>
+        <div class="section-body">
+          <form id="planner-form" class="setup-grid">
+            <label class="field">Assembly / Finished Product
+              <span class="combobox">
+                <input id="assembly-search" type="search" autocomplete="off" placeholder="Search assemblies by name or IPN…" aria-autocomplete="list" aria-controls="assembly-options">
+                <span id="assembly-options" class="options hidden" role="listbox"></span>
+              </span>
+              <span id="selection-help" class="help">Choose an assembly with a saved BOM.</span>
+            </label>
+            <label class="field">Target quantity <span class="help">Optional; checks shortages for a planned run.</span>
+              <input id="target" type="number" min="1" max="1000000000" step="1" inputmode="numeric" placeholder="e.g. 100">
+            </label>
+            <button id="calculate" type="submit">Calculate planned build</button>
+          </form>
+        </div>
+      </section>
+
+      <div id="results" class="hidden">
+        <section aria-labelledby="summary-heading">
+          <div class="section-head"><h2 id="summary-heading">Plan summary</h2><span id="summary-status" class="badge"></span></div>
+          <div class="section-body summary-grid">
+            <div class="metric"><div class="metric-label">Planned can build</div><div id="maximum" class="metric-value">0</div><div class="metric-detail">Additional finished products from current stock.</div></div>
+            <div class="metric"><div class="metric-label">Finished product</div><div id="assembly-name" class="metric-value" style="font-size:20px">—</div><div id="assembly-category" class="metric-detail"></div></div>
+            <div class="metric"><div class="metric-label">Target check</div><div id="target-result" class="metric-value" style="font-size:20px">Not set</div><div id="target-detail" class="metric-detail">Enter a target to see exact shortages.</div></div>
+          </div>
+        </section>
+
+        <section aria-labelledby="routes-heading">
+          <div class="section-head"><div><h2 id="routes-heading">Assembly routes</h2><span class="help">PCB categories default to JLCPCB. Change a route and recalculate if this product is built elsewhere.</span></div><button id="recalculate" class="secondary" type="button">Apply route changes</button></div>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Assembly</th><th>Build route</th><th>Why selected</th><th class="numeric">Finished stock used</th><th class="numeric">To build</th></tr></thead><tbody id="routes-body"></tbody></table></div>
+        </section>
+
+        <section aria-labelledby="requirements-heading">
+          <div class="section-head"><div><h2 id="requirements-heading">Material requirements</h2><span id="requirements-caption" class="help"></span></div></div>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Part</th><th>Allowed source pool</th><th class="numeric">Required</th><th class="numeric">Available</th><th class="numeric">Shortage</th></tr></thead><tbody id="requirements-body"></tbody></table></div>
+        </section>
+
+        <section aria-labelledby="notes-heading">
+          <div class="section-head"><h2 id="notes-heading">Calculation rules</h2></div>
+          <div class="section-body"><ul id="warnings" class="notice-list"></ul></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="alert"></div>
+  <script>
+    const csrfToken=document.querySelector('meta[name="csrf-token"]').content;
+    const initialPart='{{ initial_part|escapejs }}';
+    const form=document.getElementById('planner-form');
+    const search=document.getElementById('assembly-search');
+    const options=document.getElementById('assembly-options');
+    const target=document.getElementById('target');
+    const results=document.getElementById('results');
+    const toast=document.getElementById('toast');
+    let selectedPart=null;
+    let searchTimer=null;
+    let routeOverrides={};
+
+    const numberFormat=new Intl.NumberFormat(undefined,{maximumFractionDigits:3});
+    const number=value=>numberFormat.format(Number(value||0));
+    function showError(message){toast.textContent=message;toast.classList.remove('hidden');window.clearTimeout(showError.timer);showError.timer=window.setTimeout(()=>toast.classList.add('hidden'),7000)}
+    function element(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node}
+    async function jsonFetch(url,options={}){const response=await fetch(url,options);let body={};try{body=await response.json()}catch{}if(!response.ok)throw new Error(body.error||`Request failed (${response.status})`);return body}
+    function choosePart(part){selectedPart=part;search.value=part.label||part.name;options.classList.add('hidden');document.getElementById('selection-help').textContent=part.category||'Assembly';routeOverrides={}}
+    async function findAssemblies(query){
+      const body=await jsonFetch(`/plugin/diptrace-bom/parts/?assemblies=1&q=${encodeURIComponent(query||'')}`);
+      options.replaceChildren();
+      if(!body.parts.length){options.append(element('div','empty','No matching assemblies found.'));options.classList.remove('hidden');return}
+      for(const part of body.parts){const button=element('button','option');button.type='button';button.setAttribute('role','option');button.append(element('strong','',part.name));button.append(element('small','',[part.ipn,part.category].filter(Boolean).join(' · ')||'Assembly'));button.addEventListener('click',()=>choosePart(part));options.append(button)}
+      options.classList.remove('hidden');
+      if(initialPart&&!selectedPart){const exact=body.parts.find(part=>String(part.pk)===String(initialPart));if(exact)choosePart(exact)}
+    }
+    search.addEventListener('input',()=>{selectedPart=null;window.clearTimeout(searchTimer);searchTimer=window.setTimeout(()=>findAssemblies(search.value).catch(error=>showError(error.message)),220)});
+    search.addEventListener('focus',()=>{if(!selectedPart)findAssemblies(search.value).catch(error=>showError(error.message))});
+    document.addEventListener('click',event=>{if(!event.target.closest('.combobox'))options.classList.add('hidden')});
+
+    function partCell(part){const td=element('td');const link=element('a','part-link',`${part.name} ↗`);link.href=part.web_url;link.target='_blank';link.rel='noopener noreferrer';td.append(link);const detail=[part.ipn,part.category].filter(Boolean).join(' · ');if(detail)td.append(element('span','subtext',detail));return td}
+    function renderRoutes(routes){
+      const body=document.getElementById('routes-body');body.replaceChildren();
+      for(const row of routes){const tr=document.createElement('tr');tr.append(partCell(row.part));const routeTd=element('td');const select=element('select','route-select');select.setAttribute('aria-label',`Build route for ${row.part.name}`);for(const [value,label] of [['local','Local assembly'],['jlcpcb','JLCPCB assembly']]){const option=element('option','',label);option.value=value;option.selected=row.route===value;select.append(option)}select.addEventListener('change',()=>{routeOverrides[String(row.part.pk)]=select.value});routeTd.append(select);tr.append(routeTd);tr.append(element('td','muted',row.route_reason));tr.append(element('td','numeric',number(row.finished_stock_used)));tr.append(element('td','numeric',number(row.to_build)));body.append(tr)}
+    }
+    function poolDetail(row){if(row.context==='local')return 'Local, non-external stock';const p=row.pools;return `Public + Private / Pre-order: ${number(p.public)} + ${number(p.private)} = ${number(p.standard)}; Consigned: ${number(p.consigned)}. Using ${row.source}.`}
+    function renderRequirements(rows,checkedQuantity){
+      const body=document.getElementById('requirements-body');body.replaceChildren();
+      document.getElementById('requirements-caption').textContent=`Quantities needed to test a build of ${number(checkedQuantity)}.`;
+      if(!rows.length){const tr=document.createElement('tr');const td=element('td','muted','No leaf material requirements were found.');td.colSpan=5;tr.append(td);body.append(tr);return}
+      for(const row of rows){const tr=document.createElement('tr');tr.append(partCell(row.part));const source=element('td','',row.source);source.append(element('span','subtext',poolDetail(row)));tr.append(source);tr.append(element('td','numeric',number(row.required)));tr.append(element('td',`numeric ${Number(row.available)>=Number(row.required)?'available':''}`,number(row.available)));tr.append(element('td',`numeric ${Number(row.shortage)>0?'shortage':'muted'}`,number(row.shortage)));body.append(tr)}
+    }
+    function render(data){
+      results.classList.remove('hidden');document.getElementById('maximum').textContent=number(data.planned_can_build);document.getElementById('assembly-name').textContent=data.assembly.name;document.getElementById('assembly-category').textContent=data.assembly.category||'Uncategorised';
+      const status=document.getElementById('summary-status');status.className='badge '+(data.planned_can_build>0?'ok':'danger');status.textContent=data.planned_can_build>0?'Build capacity found':'Blocked';
+      const targetResult=document.getElementById('target-result');const targetDetail=document.getElementById('target-detail');if(data.target===null){targetResult.textContent='Not set';targetResult.style.color='';targetDetail.textContent='The requirement table tests the first quantity that cannot be built.'}else{targetResult.textContent=data.target_feasible?'Can build':'Cannot build';targetResult.style.color=data.target_feasible?'var(--ok)':'var(--danger)';targetDetail.textContent=`Target: ${number(data.target)} finished products.`}
+      renderRoutes(data.routes);renderRequirements(data.requirements,data.checked_quantity);const warnings=document.getElementById('warnings');warnings.replaceChildren();for(const message of data.warnings){const li=element('li','notice',message);warnings.append(li)}
+      results.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    async function calculate(){
+      if(!selectedPart){showError('Choose an assembly from the search results.');search.focus();return}
+      const button=document.getElementById('calculate');button.disabled=true;button.textContent='Calculating…';document.body.classList.add('loading');
+      try{const data=await jsonFetch('/plugin/diptrace-bom/planner/plan/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken},body:JSON.stringify({part_id:selectedPart.pk,target:target.value||null,route_overrides:routeOverrides})});render(data)}catch(error){showError(error.message)}finally{button.disabled=false;button.textContent='Calculate planned build';document.body.classList.remove('loading')}
+    }
+    form.addEventListener('submit',event=>{event.preventDefault();calculate()});document.getElementById('recalculate').addEventListener('click',calculate);
+    if(initialPart)findAssemblies(initialPart).catch(error=>showError(error.message));
+  </script>
+</body>
+</html>

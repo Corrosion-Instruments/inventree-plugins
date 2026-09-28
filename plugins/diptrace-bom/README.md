@@ -9,6 +9,25 @@ This plugin provides a guarded workflow for turning a DipTrace CSV/XLSX export i
 5. Manually resolve ambiguous/unmatched rows (or explicitly create them when enabled).
 6. Merge into or replace the assembly BOM in one database transaction.
 
+## Nested BOM build planner
+
+The **Build Planner** page at `/plugin/diptrace-bom/planner/` calculates how
+many additional finished products can be made from a saved, multi-level
+InvenTree BOM. It uses completed local subassemblies first, recursively expands
+the remaining demand, and aggregates shared leaf components so the same stock
+is not counted twice.
+
+Assemblies in a `PCB` / `PCBs` category default to the JLCPCB route. Other
+assemblies default to local production, and every inferred route can be
+overridden on the result page. Local builds use only non-external local stock.
+JLCPCB builds use the greater of `Public Catalogue + Private / Pre-order` or
+`Consigned` for each component; those two routes are never added together and
+Global Sourcing is always ignored. BOM setup quantity and attrition are included.
+
+An optional target quantity shows the exact leaf requirements and shortages for
+that run. This planner is read-only and does not replace InvenTree's native
+single-level `Can Build` value.
+
 ## Separate JLC part catalogue importer
 
 The plugin also provides **JLC Part Catalogue**, a separate page at
