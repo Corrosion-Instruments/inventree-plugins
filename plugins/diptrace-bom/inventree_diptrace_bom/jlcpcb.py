@@ -174,14 +174,25 @@ def availability_summary(public: dict | None, private: dict | None) -> dict:
     private = private or {}
     buckets = {
         "jlcpcb_parts": _number(private.get("jlcpcbParts")),
-        "global_sourcing": _number(private.get("globalSourcingParts")),
         "consigned": _number(private.get("consignedParts")),
-        "idle_stock": _number(private.get("idleStock")),
     }
+    public_stock = _number(public.get("stockCount"))
+    standard_route_stock = public_stock + buckets["jlcpcb_parts"]
+    consigned_route_stock = buckets["consigned"]
+    usable_stock = max(standard_route_stock, consigned_route_stock)
     return {
-        "public_stock": _number(public.get("stockCount")),
+        "public_stock": public_stock,
         "private_total": sum(buckets.values()),
         **buckets,
+        "standard_route_stock": standard_route_stock,
+        "consigned_route_stock": consigned_route_stock,
+        "usable_stock": usable_stock,
+        "preferred_route": (
+            "consigned" if consigned_route_stock > standard_route_stock else "standard"
+        ),
+        # Keep this informational field visible to diagnostics, but do not
+        # include it in managed stock or build-capacity calculations.
+        "idle_stock": _number(private.get("idleStock")),
         "model": public.get("componentModel") or private.get("componentModel") or "",
         "specification": public.get("componentSpecification")
         or private.get("componentSpecification")
@@ -191,15 +202,23 @@ def availability_summary(public: dict | None, private: dict | None) -> dict:
 
 
 def private_stock_quantities(private: dict | None) -> dict[str, Decimal]:
-    """Return the three JLC-owned inventory buckets mirrored into InvenTree."""
+    """Return the supported account inventory mirrored into InvenTree.
+
+    Global Sourcing is deliberately excluded. Corrosion Instruments does not
+    use that purchasing route; including it would also create an incompatible
+    stock pool for JLCPCB assembly calculations.
+    """
     private = private or {}
     return {
         "private": _stock_bucket_number(private.get("jlcpcbParts"), "jlcpcbParts"),
-        "global": _stock_bucket_number(
-            private.get("globalSourcingParts"), "globalSourcingParts"
-        ),
         "consigned": _stock_bucket_number(private.get("consignedParts"), "consignedParts"),
     }
+
+
+def public_stock_quantity(public: dict | None) -> Decimal:
+    """Return a strict public-catalogue quantity suitable for stock sync."""
+    public = public or {}
+    return _stock_bucket_number(public.get("stockCount"), "stockCount")
 
 
 def _stock_bucket_number(value: Any, field_name: str) -> Decimal:

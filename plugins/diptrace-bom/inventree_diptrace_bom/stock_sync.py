@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 from decimal import Decimal
+import re
 from typing import Any
 
-from .jlcpcb import JlcClient, JlcCredentials, private_stock_quantities
+from .jlcpcb import (
+    JlcClient,
+    JlcCredentials,
+    private_stock_quantities,
+    public_stock_quantity,
+)
 
 
 class JlcStockSyncError(RuntimeError):
@@ -14,8 +20,13 @@ class JlcStockSyncError(RuntimeError):
 
 
 MANAGED_BATCH_PREFIX = "DIPTRACE-JLC:"
+COMPONENT_CODE_PATTERN = re.compile(r"^C\d+$")
 
 BUCKETS = {
+    "public": {
+        "setting": "JLC_PUBLIC_LOCATION",
+        "label": "Public Catalogue",
+    },
     "consigned": {
         "setting": "JLC_CONSIGNED_LOCATION",
         "label": "Consigned Parts",
@@ -24,11 +35,11 @@ BUCKETS = {
         "setting": "JLC_PRIVATE_LOCATION",
         "label": "JLCPCB Private Parts",
     },
-    "global": {
-        "setting": "JLC_GLOBAL_LOCATION",
-        "label": "Global Sourcing Reserved",
-    },
 }
+
+# Recognize legacy markers so an older Global Sourcing row can be retired
+# safely instead of remaining as usable stock after the setting is removed.
+PARSEABLE_BUCKETS = {*BUCKETS, "global"}
 
 
 def normalize_code(value: Any) -> str:
@@ -49,7 +60,7 @@ def parse_managed_batch(value: Any) -> tuple[str, str] | None:
     remainder = text[len(MANAGED_BATCH_PREFIX) :]
     bucket, separator, code = remainder.partition(":")
     code = normalize_code(code)
-    if not separator or bucket not in BUCKETS or not code:
+    if not separator or bucket not in PARSEABLE_BUCKETS or not code:
         return None
     return bucket, code
 
@@ -73,23 +84,48 @@ class JlcStockSyncService:
             )
 
         locations = self.locations()
+        component_codes = self.supplier_codes(supplier_id)
         client = JlcClient(
             credentials,
             host=str(self.setting("JLC_HOST", "https://open.jlcpcb.com")),
             timeout=int(self.setting("JLC_TIMEOUT", 30)),
         )
 
-        # Do not enter a database transaction until a complete API snapshot succeeds.
+        # Do not enter a database transaction until both complete API snapshots
+        # succeed. Public details are requested only for supplier C-codes which
+        # already exist in InvenTree.
+        public_catalogue = client.component_details(component_codes)
         library = client.private_library()
         return self._reconcile(
             supplier_id=supplier_id,
             locations=locations,
+            public_catalogue=public_catalogue,
             library=library,
             user=user,
         )
 
+    def supplier_codes(self, supplier_id) -> list[str]:
+        """Return the unique configured-supplier C-codes to request publicly."""
+        from company.models import Company, SupplierPart
+
+        supplier = Company.objects.filter(pk=supplier_id, is_supplier=True).first()
+        if not supplier:
+            raise JlcStockSyncError("The configured JLC / LCSC supplier no longer exists")
+        return sorted(
+            {
+                code
+                for code in (
+                    normalize_code(value)
+                    for value in SupplierPart.objects.filter(supplier=supplier).values_list(
+                        "SKU", flat=True
+                    )
+                )
+                if code and COMPONENT_CODE_PATTERN.fullmatch(code)
+            }
+        )
+
     def locations(self) -> dict[str, Any]:
-        """Return and validate the three configured external stock locations."""
+        """Return and validate the configured external stock locations."""
         from stock.models import StockLocation
 
         location_ids = {
@@ -131,7 +167,15 @@ class JlcStockSyncService:
             )
         return locations
 
-    def _reconcile(self, *, supplier_id, locations: dict[str, Any], library: dict, user) -> dict:
+    def _reconcile(
+        self,
+        *,
+        supplier_id,
+        locations: dict[str, Any],
+        public_catalogue: dict,
+        library: dict,
+        user,
+    ) -> dict:
         """Apply a complete successful snapshot in one database transaction."""
         from company.models import Company, SupplierPart
         from django.db import transaction
@@ -142,8 +186,15 @@ class JlcStockSyncService:
             for code, item in library.items()
             if normalize_code(code)
         }
+        normalized_public = {
+            normalize_code(code): item
+            for code, item in public_catalogue.items()
+            if normalize_code(code)
+        }
         result = {
-            "api_components": len(normalized_library),
+            "api_components": len(set(normalized_public) | set(normalized_library)),
+            "public_api_components": len(normalized_public),
+            "private_api_components": len(normalized_library),
             "matched_components": 0,
             "created": 0,
             "updated": 0,
@@ -153,6 +204,7 @@ class JlcStockSyncService:
             "ambiguous_components": 0,
             "unmatched_codes": [],
             "ambiguous_codes": [],
+            "retired_global_rows": 0,
         }
 
         with transaction.atomic():
@@ -176,11 +228,9 @@ class JlcStockSyncService:
                 if code:
                     supplier_parts_by_code[code].append(supplier_part)
 
-            location_ids = [location.pk for location in locations.values()]
             managed_items = list(
                 StockItem.objects.select_for_update()
                 .filter(
-                    location_id__in=location_ids,
                     batch__startswith=MANAGED_BATCH_PREFIX,
                 )
                 .select_related("supplier_part", "part")
@@ -192,14 +242,34 @@ class JlcStockSyncService:
                 if not parsed:
                     continue
                 bucket, code = parsed
+                if bucket == "global":
+                    if stock_item.quantity != Decimal("0"):
+                        stock_item.stocktake(
+                            Decimal("0"),
+                            user,
+                            notes="Global Sourcing retired from DipTrace JLCPCB sync",
+                        )
+                        result["updated"] += 1
+                        result["zeroed"] += 1
+                    result["retired_global_rows"] += 1
+                    continue
                 if stock_item.location_id != locations[bucket].pk:
+                    if stock_item.quantity != Decimal("0"):
+                        stock_item.stocktake(
+                            Decimal("0"),
+                            user,
+                            notes="DipTrace JLCPCB sync row found outside its configured location",
+                        )
+                        result["updated"] += 1
+                        result["zeroed"] += 1
                     continue
                 managed_by_key[(code, bucket)].append(stock_item)
 
             expected_keys: set[tuple[str, str]] = set()
             ambiguous_codes: set[str] = set()
 
-            for code, private_item in normalized_library.items():
+            all_codes = set(supplier_parts_by_code) | set(normalized_library)
+            for code in sorted(all_codes):
                 matches = supplier_parts_by_code.get(code, [])
                 if not matches:
                     result["unmatched_components"] += 1
@@ -215,7 +285,10 @@ class JlcStockSyncService:
 
                 result["matched_components"] += 1
                 supplier_part = matches[0]
-                quantities = private_stock_quantities(private_item)
+                quantities = {
+                    "public": public_stock_quantity(normalized_public.get(code)),
+                    **private_stock_quantities(normalized_library.get(code)),
+                }
                 for bucket, desired in quantities.items():
                     key = (code, bucket)
                     expected_keys.add(key)

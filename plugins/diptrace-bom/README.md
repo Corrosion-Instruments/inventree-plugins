@@ -99,12 +99,15 @@ fields. These fields remain blank when JLCPCB does not provide them.
 
 ## JLCPCB stock synchronization
 
-The plugin can mirror the three JLCPCB-owned inventory buckets into InvenTree
-external stock locations every 30 minutes:
+The plugin can mirror the three supported JLCPCB availability buckets into
+InvenTree external stock locations every 30 minutes:
 
+- public `stockCount` → Public Catalogue
 - `consignedParts` → Consigned Parts
 - `jlcpcbParts` → JLCPCB Private Parts
-- `globalSourcingParts` → Global Sourcing Reserved
+
+`globalSourcingParts` and `idleStock` are deliberately ignored. Corrosion
+Instruments does not use Global Sourcing for PCBA orders.
 
 Only existing `SupplierPart` records belonging to the configured JLC/LCSC
 supplier are eligible, and the supplier SKU must exactly match the JLCPCB C-code.
@@ -138,16 +141,18 @@ Configure these under **Admin Center → Plugins → DipTrace BOM → Settings**
 - `JLCPCB Access Key`
 - `JLCPCB Secret Key` (the `secretKey` from the API key pair, not an RSA private key)
 - `JLC / LCSC Supplier` (the supplier whose SKU stores the `C12345` code)
+- `JLCPCB Public Catalogue Location`
 - `JLCPCB Consigned Parts Location`
 - `JLCPCB Private Parts Location`
-- `JLCPCB Global Sourcing Location`
 - `Enable JLCPCB Stock Sync`
 - optionally enable `Allow Missing Part Creation` and choose a `Default Component Category`
 
 Create the three locations as non-structural children under a `JLCPCB` parent and
 mark each child location as **External**. Each bucket must use a different
-location. External stock participates in InvenTree's normal available-stock and
-can-build calculations, while remaining visibly separate from company storage.
+location. External stock participates in InvenTree's normal available-stock,
+while remaining visibly separate from company storage. The importer calculates
+JLCPCB capacity as the greater of `Public Catalogue + Private / Pre-order` or
+`Consigned`; it never adds these incompatible assembly routes together.
 
 Also enable **Admin Center → Plugin Settings → Enable schedule integration** and
 run an InvenTree background worker. Restart both the web server and worker after

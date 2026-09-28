@@ -15,6 +15,7 @@ from inventree_diptrace_bom.jlcpcb import (
     compact_json,
     make_signature,
     private_stock_quantities,
+    public_stock_quantity,
 )
 
 
@@ -90,7 +91,12 @@ class JlcTests(unittest.TestCase):
             },
         )
         self.assertEqual(str(result["public_stock"]), "123")
-        self.assertEqual(str(result["private_total"]), "10")
+        self.assertEqual(str(result["private_total"]), "6")
+        self.assertEqual(str(result["standard_route_stock"]), "125")
+        self.assertEqual(str(result["consigned_route_stock"]), "4")
+        self.assertEqual(str(result["usable_stock"]), "125")
+        self.assertEqual(result["preferred_route"], "standard")
+        self.assertNotIn("global_sourcing", result)
 
     def test_reads_official_detail_response_envelope(self):
         payload = {
@@ -103,7 +109,7 @@ class JlcTests(unittest.TestCase):
         }
         self.assertEqual(_component_rows(payload)[0]["componentCode"], "C77014")
 
-    def test_private_stock_quantities_maps_only_managed_buckets(self):
+    def test_private_stock_quantities_ignores_unsupported_buckets(self):
         result = private_stock_quantities(
             {
                 "jlcpcbParts": 2,
@@ -113,9 +119,24 @@ class JlcTests(unittest.TestCase):
             }
         )
         self.assertEqual(str(result["private"]), "2")
-        self.assertEqual(str(result["global"]), "3")
         self.assertEqual(str(result["consigned"]), "73")
+        self.assertNotIn("global", result)
         self.assertNotIn("idle", result)
+
+    def test_consigned_route_wins_without_combining_routes(self):
+        result = availability_summary(
+            {"stockCount": 30},
+            {"jlcpcbParts": 20, "consignedParts": 75},
+        )
+        self.assertEqual(str(result["standard_route_stock"]), "50")
+        self.assertEqual(str(result["consigned_route_stock"]), "75")
+        self.assertEqual(str(result["usable_stock"]), "75")
+        self.assertEqual(result["preferred_route"], "consigned")
+
+    def test_public_stock_quantity_is_strict(self):
+        self.assertEqual(str(public_stock_quantity({"stockCount": {"quantity": 17}})), "17")
+        with self.assertRaisesRegex(JlcApiError, "invalid stockCount quantity"):
+            public_stock_quantity({"stockCount": "not-a-number"})
 
     def test_invalid_private_quantity_is_rejected_before_stock_changes(self):
         with self.assertRaisesRegex(JlcApiError, "invalid consignedParts quantity"):

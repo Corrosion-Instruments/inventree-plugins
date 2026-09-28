@@ -369,6 +369,20 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn('assembly=True', plugin)
         self.assertIn('check_user_permission(request.user, Part, "add")', plugin)
 
+    def test_bom_importer_uses_supported_jlc_stock_routes(self):
+        root = Path(__file__).resolve().parents[1]
+        importer = (root / "inventree_diptrace_bom/templates/inventree_diptrace_bom/import.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "const standard=stockNumber(jlc.public_stock) + stockNumber(jlc.jlcpcb_parts)",
+            importer,
+        )
+        self.assertIn("usable:Math.max(standard,consigned)", importer)
+        self.assertIn("const bestAvailable=Math.max(localAvailable,externalAvailable)", importer)
+        self.assertNotIn("stockNumber(jlc.global_sourcing)", importer)
+        self.assertNotIn("localAvailable + externalAvailable", importer)
+
     def test_modern_navigation_routes_redirect_to_server_rendered_pages(self):
         root = Path(__file__).resolve().parents[1]
         plugin = (root / "inventree_diptrace_bom/plugin.py").read_text(encoding="utf-8")

@@ -38,7 +38,7 @@ class BomImportService:
             quantity = _positive_decimal(row.get("quantity"), "quantity")
             total_quantity += quantity
             part = match.get("part")
-            available = Decimal(str(part.available_stock)) if part else Decimal("0")
+            available = local_available_stock(part) if part else Decimal("0")
             line_can_build = int((available / quantity).to_integral_value(rounding=ROUND_FLOOR))
             if part is not None:
                 assembly_can_build = (
@@ -318,47 +318,49 @@ class BomImportService:
         return part
 
     def jlc_availability(self, codes: list[str]) -> tuple[dict[str, dict], str]:
-        """Return public and private JLC stock without changing InvenTree stock."""
+        """Return the last synchronized JLC stock snapshot from InvenTree.
+
+        The background/manual stock sync is the single API writer. Reading its
+        managed StockItems here avoids adding live API quantities to the same
+        quantities after they have already been mirrored into InvenTree.
+        """
         codes = list(dict.fromkeys(str(code or "").upper() for code in codes if code))
         if not codes:
             return {}, ""
-        credentials = self.jlc_credentials()
-        if not credentials.configured:
-            return {}, "JLCPCB API credentials are not configured"
+        from stock.models import StockItem
 
-        from django.core.cache import cache
+        from .stock_sync import MANAGED_BATCH_PREFIX, parse_managed_batch
 
-        client = JlcClient(
-            credentials,
-            host=str(self.setting("JLC_HOST", "https://open.jlcpcb.com")),
-            timeout=int(self.setting("JLC_TIMEOUT", 30)),
+        quantities = {
+            code: {"public": Decimal("0"), "private": Decimal("0"), "consigned": Decimal("0")}
+            for code in codes
+        }
+        stock_items = (
+            StockItem.objects.filter(batch__startswith=MANAGED_BATCH_PREFIX)
+            .select_related("location")
+            .prefetch_related("allocations", "sales_order_allocations", "transfer_order_allocations")
         )
-        try:
-            public = {}
-            missing = []
-            for code in codes:
-                cached = cache.get(f"diptrace-bom:jlc:public:{code}")
-                if cached is None:
-                    missing.append(code)
-                else:
-                    public[code] = cached
-            if missing:
-                fetched = client.component_details(missing)
-                public.update(fetched)
-                for code in missing:
-                    cache.set(f"diptrace-bom:jlc:public:{code}", fetched.get(code, {}), 900)
+        for stock_item in stock_items:
+            parsed = parse_managed_batch(stock_item.batch)
+            if not parsed:
+                continue
+            bucket, code = parsed
+            if code not in quantities or bucket not in quantities[code]:
+                continue
+            quantities[code][bucket] += Decimal(str(stock_item.unallocated_quantity()))
 
-            private = cache.get("diptrace-bom:jlc:private")
-            if private is None:
-                private = client.private_library()
-                cache.set("diptrace-bom:jlc:private", private, 300)
-
-            return {
-                code: _json_safe(availability_summary(public.get(code), private.get(code)))
-                for code in codes
-            }, ""
-        except JlcApiError as exc:
-            return {}, str(exc)
+        return {
+            code: _json_safe(
+                availability_summary(
+                    {"stockCount": values["public"]},
+                    {
+                        "jlcpcbParts": values["private"],
+                        "consignedParts": values["consigned"],
+                    },
+                )
+            )
+            for code, values in quantities.items()
+        }, ""
 
     def jlc_credentials(self) -> JlcCredentials:
         return JlcCredentials(
@@ -402,13 +404,31 @@ def empty_jlc() -> dict:
         "public_stock": "0",
         "private_total": "0",
         "jlcpcb_parts": "0",
-        "global_sourcing": "0",
         "consigned": "0",
         "idle_stock": "0",
+        "standard_route_stock": "0",
+        "consigned_route_stock": "0",
+        "usable_stock": "0",
+        "preferred_route": "standard",
         "model": "",
         "specification": "",
         "brand": "",
     }
+
+
+def local_available_stock(part) -> Decimal:
+    """Return unallocated stock held outside external locations."""
+    from django.db.models import Q
+
+    entries = (
+        part.stock_entries(in_stock=True, include_variants=True)
+        .filter(Q(location__isnull=True) | Q(location__external=False))
+        .prefetch_related("allocations", "sales_order_allocations", "transfer_order_allocations")
+    )
+    return sum(
+        (Decimal(str(stock_item.unallocated_quantity())) for stock_item in entries),
+        Decimal("0"),
+    )
 
 
 def _match(part, status: str, reason: str, candidates=None) -> dict:

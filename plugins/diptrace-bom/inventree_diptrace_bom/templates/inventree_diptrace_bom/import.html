@@ -360,7 +360,7 @@
             <div class="metric"><span>Matched</span><strong id="metric-matched">0</strong></div>
             <div class="metric"><span>Unresolved</span><strong id="metric-unresolved">0</strong></div>
             <div class="metric" title="Complete products buildable from local InvenTree stock"><span>Local BOM Builds</span><strong id="metric-local-builds">0</strong></div>
-            <div class="metric" title="Complete products buildable from JLC Stock plus My Inventory"><span>External BOM Builds</span><strong id="metric-external-builds">0</strong></div>
+            <div class="metric" title="Complete products buildable through the best valid JLCPCB stock route"><span>JLCPCB BOM Builds</span><strong id="metric-external-builds">0</strong></div>
           </div>
           <div class="build-plan">
             <div class="build-target-field">
@@ -395,7 +395,7 @@
               </colgroup>
               <thead><tr>
                 <th scope="col" aria-label="JLCPCB component number" title="JLCPCB component number">JLC Part</th><th scope="col" aria-label="Selected InvenTree component part" title="Selected InvenTree component part">InvenTree Match</th>
-                <th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local InvenTree stock">Local Builds</th><th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="My Inventory: JLCPCB private parts, global sourcing, and consigned stock" title="JLCPCB Private Parts + Global Sourcing + Consigned">My Inventory</th><th class="numeric" scope="col" aria-label="Assemblies buildable from JLCPCB stock and My Inventory" title="Floor of (JLC Stock + My Inventory) divided by required quantity">External Builds</th>
+                <th class="numeric" scope="col" aria-label="Available stock in local InvenTree locations" title="Available stock in your local InvenTree locations">Local</th><th class="numeric" scope="col" aria-label="Assemblies buildable from local stock" title="Assemblies buildable from local InvenTree stock">Local Builds</th><th class="numeric" scope="col" aria-label="JLCPCB public catalogue stock" title="JLCPCB public catalogue stock">JLC Stock</th><th class="numeric" scope="col" aria-label="Private pre-order stock followed by consigned stock" title="Private / Pre-order and Consigned quantities, shown as separate routes">Pre-order / Consigned</th><th class="numeric" scope="col" aria-label="Assemblies buildable through the best valid JLCPCB route" title="Uses the larger of Public plus Pre-order, or Consigned">JLCPCB Builds</th>
                 <th scope="col">Footprint</th><th scope="col" aria-label="Component reference designators" title="Component reference designators">Refs</th><th scope="col" aria-label="BOM value or comment" title="BOM value or comment">Value</th><th class="numeric" scope="col" aria-label="Required quantity" title="Required quantity">Qty</th><th class="calculation-cell" scope="col" aria-label="Include in build calculations" title="Include this component in build-capacity and target calculations">Use</th>
               </tr></thead>
               <tbody id="bom-rows"></tbody>
@@ -958,22 +958,23 @@
         const td=document.createElement('td'); td.classList.add('numeric'); td.textContent=value ?? '0'; if (Number(value)===0) td.classList.add('zero'); tr.appendChild(td);
       }
       const inventoryBuckets = privateInventoryBuckets(row.jlc);
-      const inventoryTotal = inventoryBuckets.reduce((total, [, value]) => total + value, 0);
-      const inventoryTd = document.createElement('td'); inventoryTd.className='numeric'; if (inventoryTotal === 0) inventoryTd.classList.add('zero');
+      const inventoryValues = inventoryBuckets.map(([, value]) => value);
+      const inventoryTd = document.createElement('td'); inventoryTd.className='numeric'; if (inventoryValues.every(value => value === 0)) inventoryTd.classList.add('zero');
       const breakdown = document.createElement('span'); breakdown.className='inventory-breakdown'; breakdown.tabIndex=0;
-      breakdown.setAttribute('aria-label', `My Inventory ${formatStock(inventoryTotal)}. ${inventoryBuckets.map(([label,value]) => `${label} ${formatStock(value)}`).join(', ')}`);
-      const total = document.createElement('span'); total.textContent=formatStock(inventoryTotal);
+      breakdown.setAttribute('aria-label', inventoryBuckets.map(([label,value]) => `${label} ${formatStock(value)}`).join(', '));
+      const total = document.createElement('span'); total.textContent=inventoryValues.map(formatStock).join(' / ');
       const tooltip = document.createElement('span'); tooltip.className='inventory-tooltip'; tooltip.setAttribute('role','tooltip');
       const tooltipTitle = document.createElement('strong'); tooltipTitle.textContent='My Inventory Breakdown'; tooltip.appendChild(tooltipTitle);
       for (const [label,value] of inventoryBuckets) { const line=document.createElement('span'); const name=document.createElement('span'); name.textContent=label; const amount=document.createElement('b'); amount.textContent=formatStock(value); line.append(name,amount); tooltip.appendChild(line); }
       breakdown.append(total,tooltip); inventoryTd.appendChild(breakdown); tr.appendChild(inventoryTd);
       const publicStock = stockNumber(row.jlc.public_stock);
       const requiredQuantity = stockNumber(row.quantity);
+      const routes = jlcRoutes(row.jlc);
       const externalBuilds = externalBuildCapacity(row);
       const externalBuildsTd = document.createElement('td'); externalBuildsTd.className='numeric'; if (externalBuilds === 0) externalBuildsTd.classList.add('zero');
       externalBuildsTd.textContent=formatStock(externalBuilds);
-      externalBuildsTd.title=`JLC Stock ${formatStock(publicStock)} + My Inventory ${formatStock(inventoryTotal)}; ${formatStock(requiredQuantity)} required per assembly`;
-      externalBuildsTd.setAttribute('aria-label', `${formatStock(externalBuilds)} external builds from JLC Stock ${formatStock(publicStock)} plus My Inventory ${formatStock(inventoryTotal)}, with ${formatStock(requiredQuantity)} required per assembly`);
+      externalBuildsTd.title=`${routes.preferred} route selected: Public + Pre-order ${formatStock(routes.standard)}; Consigned ${formatStock(routes.consigned)}; ${formatStock(requiredQuantity)} required per assembly`;
+      externalBuildsTd.setAttribute('aria-label', `${formatStock(externalBuilds)} JLCPCB builds using the ${routes.preferred} route, with ${formatStock(requiredQuantity)} required per assembly`);
       tr.appendChild(externalBuildsTd);
       tr.appendChild(textCell(row.footprint));
       tr.appendChild(textCell(row.designators));
@@ -984,15 +985,18 @@
     }
     function privateInventoryBuckets(jlc) {
       return [
-        ['JLCPCB Private Parts', stockNumber(jlc.jlcpcb_parts)],
-        ['Global Sourcing', stockNumber(jlc.global_sourcing)],
+        ['Private / Pre-order', stockNumber(jlc.jlcpcb_parts)],
         ['Consigned', stockNumber(jlc.consigned)],
       ];
     }
+    function jlcRoutes(jlc) {
+      const standard=stockNumber(jlc.public_stock) + stockNumber(jlc.jlcpcb_parts);
+      const consigned=stockNumber(jlc.consigned);
+      return {standard,consigned,usable:Math.max(standard,consigned),preferred:consigned > standard ? 'Consigned' : 'Public + Pre-order'};
+    }
     function externalBuildCapacity(row) {
       const requiredQuantity=stockNumber(row.quantity); if (requiredQuantity <= 0) return 0;
-      const myInventory=privateInventoryBuckets(row.jlc).reduce((total,[,value]) => total + value,0);
-      return Math.floor((stockNumber(row.jlc.public_stock) + myInventory) / requiredQuantity);
+      return Math.floor(jlcRoutes(row.jlc).usable / requiredQuantity);
     }
     function calculationRows() {
       return state.preview ? state.preview.rows.filter(row => !state.calculationExclusions.has(String(row.row))) : [];
@@ -1049,7 +1053,7 @@
       renderCalculationExclusionBadges();
       const title=excluded ? `${excluded} BOM line${excluded === 1 ? '' : 's'} excluded from this calculation; the finalized BOM is unchanged` : '';
       el['metric-local-builds'].parentElement.title=title || 'Complete products buildable from local InvenTree stock';
-      el['metric-external-builds'].parentElement.title=title || 'Complete products buildable from JLC Stock plus My Inventory';
+      el['metric-external-builds'].parentElement.title=title || 'Complete products buildable through the best valid JLCPCB stock route';
       updateTargetAnalysis();
     }
     function updateTargetAnalysis() {
@@ -1067,13 +1071,13 @@
       const coverage=includedRows.map(row => {
         const required=stockNumber(row.quantity) * target;
         const localAvailable=stockNumber(row.local.available);
-        const myInventory=privateInventoryBuckets(row.jlc).reduce((total,[,value]) => total + value,0);
-        const externalAvailable=stockNumber(row.jlc.public_stock) + myInventory;
-        const combinedAvailable=localAvailable + externalAvailable;
-        return {row,required,localAvailable,externalAvailable,combinedAvailable,shortage:Math.max(required-combinedAvailable,0)};
+        const routes=jlcRoutes(row.jlc);
+        const externalAvailable=routes.usable;
+        const bestAvailable=Math.max(localAvailable,externalAvailable);
+        return {row,required,localAvailable,externalAvailable,bestAvailable,routes,shortage:Math.max(required-bestAvailable,0)};
       });
       const blocking=coverage.filter(item => item.shortage > 0);
-      setPlanStatus(el['target-combined-summary'],'All sources',target,blocking.length);
+      setPlanStatus(el['target-combined-summary'],'Best available route',target,blocking.length);
       const visible=state.targetFilter === 'missing' ? blocking : coverage;
       el['target-shortage-list'].innerHTML='';
       for (const item of blocking) document.querySelector(`#bom-rows tr[data-row="${item.row.row}"]`)?.classList.add('target-shortage');
@@ -1106,11 +1110,11 @@
       const source=document.createElement('div'); source.className=`shortage-source ${item.shortage > 0 ? 'missing' : ''}`;
       const heading=document.createElement('strong'); heading.textContent=item.shortage > 0 ? 'Missing' : 'Covered';
       const detail=document.createElement('span');
-      if (item.shortage > 0 && item.combinedAvailable <= 0) detail.textContent=`Missing all ${formatStock(item.required)} · 0 available`;
-      else if (item.shortage > 0) detail.textContent=`${formatStock(item.shortage)} short · ${formatStock(item.combinedAvailable)} available across all sources`;
+      if (item.shortage > 0 && item.bestAvailable <= 0) detail.textContent=`Missing all ${formatStock(item.required)} · 0 available`;
+      else if (item.shortage > 0) detail.textContent=`${formatStock(item.shortage)} short · best route has ${formatStock(item.bestAvailable)}`;
       else if (item.localAvailable >= item.required) detail.textContent=`Ready from local stock · ${formatStock(item.localAvailable)} available`;
-      else if (item.externalAvailable >= item.required) detail.textContent=`Ready from external stock · ${formatStock(item.externalAvailable)} available`;
-      else detail.textContent=`Ready using local + external · ${formatStock(item.combinedAvailable)} combined`;
+      else if (item.externalAvailable >= item.required) detail.textContent=`Ready through JLCPCB ${item.routes.preferred} · ${formatStock(item.externalAvailable)} available`;
+      else detail.textContent=`No single valid stock route covers ${formatStock(item.required)}`;
       source.append(heading,detail); return source;
     }
     function stockNumber(value) { const number=Number(value ?? 0); return Number.isFinite(number) ? number : 0; }

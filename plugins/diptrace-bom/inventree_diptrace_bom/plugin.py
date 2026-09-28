@@ -46,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.6.14"
+    VERSION = "0.7.0"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -104,10 +104,15 @@ class DipTraceBomPlugin(
         "ENABLE_JLC_STOCK_SYNC": {
             "name": _("Enable JLCPCB Stock Sync"),
             "description": _(
-                "Every 30 minutes, mirror JLCPCB-owned quantities onto exact existing supplier-SKU matches"
+                "Every 30 minutes, mirror JLCPCB public, pre-order and consigned quantities onto exact existing supplier-SKU matches"
             ),
             "default": False,
             "validator": bool,
+        },
+        "JLC_PUBLIC_LOCATION": {
+            "name": _("JLCPCB Public Catalogue Location"),
+            "description": _("External, non-structural location for public stockCount"),
+            "model": "stock.stocklocation",
         },
         "JLC_CONSIGNED_LOCATION": {
             "name": _("JLCPCB Consigned Parts Location"),
@@ -117,11 +122,6 @@ class DipTraceBomPlugin(
         "JLC_PRIVATE_LOCATION": {
             "name": _("JLCPCB Private Parts Location"),
             "description": _("External, non-structural location for jlcpcbParts"),
-            "model": "stock.stocklocation",
-        },
-        "JLC_GLOBAL_LOCATION": {
-            "name": _("JLCPCB Global Sourcing Location"),
-            "description": _("External, non-structural location for globalSourcingParts"),
             "model": "stock.stocklocation",
         },
         "ALLOW_CREATE_MISSING": {
