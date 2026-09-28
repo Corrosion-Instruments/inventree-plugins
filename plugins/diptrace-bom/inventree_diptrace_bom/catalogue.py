@@ -7,6 +7,7 @@ InvenTree identities so a stale preview cannot silently link the wrong part.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import asdict, dataclass, replace
 from decimal import Decimal
 from urllib.parse import urlparse
@@ -46,6 +47,25 @@ class JlcPart:
 def normalize_identifier(value: str) -> str:
     """Ignore only casing and incidental whitespace, not suffixes or punctuation."""
     return " ".join(str(value or "").split()).casefold()
+
+
+MPN_DASH_TRANSLATION = str.maketrans({
+    character: "-"
+    for character in "\u2010\u2011\u2012\u2013\u2014\u2043\u2212\ufe58\ufe63\uff0d"
+})
+
+
+def normalize_mpn(value: str) -> str:
+    """Compare MPNs without case, spacing, invisible marks, or dash glyph noise.
+
+    Meaningful punctuation remains significant: only visually equivalent dash
+    characters are mapped to ASCII ``-``.
+    """
+    text = unicodedata.normalize("NFKC", str(value or "")).translate(MPN_DASH_TRANSLATION)
+    return "".join(
+        character for character in text
+        if not character.isspace() and unicodedata.category(character) != "Cf"
+    ).casefold()
 
 
 def _category_words(value: str) -> set[str]:
@@ -217,7 +237,7 @@ def compare_row(row: dict, product: JlcPart) -> str | None:
     reviewed_mpn = reviewed_sheet_mpn(row)
     if not reviewed_mpn:
         return "The spreadsheet MPN is blank; enter it and check again"
-    if normalize_identifier(reviewed_mpn) != normalize_identifier(product.mpn):
+    if normalize_mpn(reviewed_mpn) != normalize_mpn(product.mpn):
         return f"Spreadsheet MPN {reviewed_mpn!r} differs from JLCPCB MFR Part # {product.mpn!r}"
     return None
 
@@ -329,7 +349,7 @@ class CatalogueImportService:
         subcategory = str(record.get("secondTypeName") or "").strip()
         if not all((manufacturer, mpn, package)):
             page = self.client.fetch(code)
-            if mpn and normalize_identifier(mpn) != normalize_identifier(page.mpn):
+            if mpn and normalize_mpn(mpn) != normalize_mpn(page.mpn):
                 raise CatalogueError(f"JLCPCB API and page disagree on the MPN for {code}")
             if package and normalize_identifier(package) != normalize_identifier(page.package):
                 raise CatalogueError(f"JLCPCB API and page disagree on the package for {code}")
@@ -621,7 +641,7 @@ class CatalogueImportService:
                     output["skipped"].append({"code": code, "reason": "JLCPCB consignment source changed since preview; check this row again"})
                     continue
                 product = JlcPart(**item["product"])
-                if normalize_identifier(reviewed_mpns.get(row_key)) != normalize_identifier(product.mpn):
+                if normalize_mpn(reviewed_mpns.get(row_key)) != normalize_mpn(product.mpn):
                     output["skipped"].append({"code": code, "reason": "JLCPCB MPN changed since preview; preview the file again"})
                     continue
                 if normalize_identifier(reviewed_manufacturers.get(row_key)) != normalize_identifier(product.manufacturer):
@@ -895,7 +915,7 @@ def _conflicting_codes(rows: list[dict]) -> set[str]:
     conflicts: set[str] = set()
     for row in rows:
         code = str(row.get("jlcpcb_part") or "").upper()
-        mpn = normalize_identifier(reviewed_sheet_mpn(row))
+        mpn = normalize_mpn(reviewed_sheet_mpn(row))
         if code in seen and seen[code] != mpn:
             conflicts.add(code)
         seen.setdefault(code, mpn)

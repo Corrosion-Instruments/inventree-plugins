@@ -23,6 +23,7 @@ from inventree_diptrace_bom.catalogue import (
     group_manufacturer_parts,
     package_needs_resolution,
     parse_jlc_page,
+    normalize_mpn,
     reviewed_sheet_mpn,
     validate_package_choice,
     validate_external_link,
@@ -221,6 +222,22 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn("AF0402FR-07100RL", compare_row(edited, jlc))
         self.assertNotIn("RES_0402", compare_row(edited, jlc))
         self.assertEqual(original["footprint"], "RES_0402 - AF0402FR-07100RL")
+
+    def test_mpn_comparison_is_case_insensitive_and_normalizes_visual_noise(self):
+        api_part = JlcPart("C9900053998", "Seeed Studio", "XIAO-nRF52840", "", "SMD",
+                           "https://jlcpcb.com/partdetail/C9900053998")
+        variants = (
+            "xiao-nrf52840",
+            "XIAO - nRF52840",
+            "XIAO\u2011nRF52840",
+            "XIAO-nRF52840\u200b",
+        )
+        for value in variants:
+            with self.subTest(value=value):
+                self.assertEqual(normalize_mpn(value), "xiao-nrf52840")
+                self.assertIsNone(compare_row({"sheet_mpn": value}, api_part))
+
+        self.assertNotEqual(normalize_mpn("XIAO_nRF52840"), normalize_mpn(api_part.mpn))
 
     def test_sheet_mpn_override_validates_row_and_length(self):
         rows = [{"row": 10, "jlcpcb_part": "C106232", "footprint": "RAW"}]
