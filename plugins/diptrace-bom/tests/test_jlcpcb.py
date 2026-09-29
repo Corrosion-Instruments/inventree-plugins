@@ -16,6 +16,7 @@ from inventree_diptrace_bom.jlcpcb import (
     make_signature,
     private_stock_quantities,
     public_stock_quantity,
+    safe_component_detail,
 )
 
 
@@ -141,6 +142,22 @@ class JlcTests(unittest.TestCase):
     def test_invalid_private_quantity_is_rejected_before_stock_changes(self):
         with self.assertRaisesRegex(JlcApiError, "invalid consignedParts quantity"):
             private_stock_quantities({"consignedParts": "not-a-number"})
+
+    def test_safe_component_detail_allow_lists_fields_and_images(self):
+        result = safe_component_detail({
+            "componentCode": "C77014",
+            "componentModel": "GRM155R71H104KE14D",
+            "description": "100nF 50V X7R 0402",
+            "componentImageUrl": "https://assets.example.com/C77014.jpg",
+            "nestedImages": [
+                {"largeImage": "https://assets.example.com/C77014-large.jpg"}
+            ],
+            "secretInternalField": "must-not-leak",
+        })
+        self.assertEqual(result["componentCode"], "C77014")
+        self.assertEqual(len(result["imageUrls"]), 2)
+        self.assertNotIn("secretInternalField", result)
+        self.assertIn("secretInternalField", result["availableFields"])
 
 
 if __name__ == "__main__":

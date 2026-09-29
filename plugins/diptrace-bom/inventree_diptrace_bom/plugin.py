@@ -12,6 +12,7 @@ from django.middleware.csrf import get_token
 from django.shortcuts import render
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.csrf import csrf_exempt
 
 from plugin import InvenTreePlugin
 from plugin.mixins import (
@@ -22,7 +23,7 @@ from plugin.mixins import (
 )
 
 from .catalogue import CatalogueError, CatalogueImportService, apply_sheet_mpn_overrides
-from .jlcpcb import JlcApiError, JlcClient
+from .jlcpcb import JlcApiError, JlcClient, safe_component_detail
 from .parser import BomParseError, parse_bom
 from .planner import BuildPlannerError, BuildPlannerService
 from .services import BomImportError, BomImportService, part_summary
@@ -45,7 +46,7 @@ class DipTraceBomPlugin(
     SLUG = "diptrace-bom"
     TITLE = "DipTrace BOM"
     DESCRIPTION = "Import DipTrace BOMs and synchronize InvenTree / JLCPCB availability"
-    VERSION = "0.8.2"
+    VERSION = "0.8.3"
     AUTHOR = "Corrosion Instruments"
     MIN_VERSION = "1.5.2"
 
@@ -371,6 +372,71 @@ class DipTraceBomPlugin(
             }
         )
 
+    @csrf_exempt
+    def component_details_api(self, request):
+        """Return sanitized JLC facts using the plugin's protected credentials."""
+        user = request.user
+        if not user.is_authenticated:
+            try:
+                from rest_framework.authentication import TokenAuthentication
+
+                authenticated = TokenAuthentication().authenticate(request)
+            except Exception:
+                authenticated = None
+            if authenticated:
+                user = authenticated[0]
+        if not user.is_authenticated or not user.is_superuser:
+            return JsonResponse({"error": "Superuser access required"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+        try:
+            data = json_request(request)
+            values = data.get("component_codes")
+            if not isinstance(values, list) or not 1 <= len(values) <= 1000:
+                return JsonResponse(
+                    {"error": "Provide between 1 and 1,000 component_codes"},
+                    status=400,
+                )
+            from .catalogue import CODE_RE
+
+            codes = list(
+                dict.fromkeys(str(value or "").strip().upper() for value in values)
+            )
+            invalid = [code for code in codes if not CODE_RE.fullmatch(code)]
+            if invalid:
+                return JsonResponse(
+                    {"error": "Invalid JLCPCB component code", "invalid": invalid},
+                    status=400,
+                )
+            service = self._catalogue_service()
+            if service.api_client is None:
+                return JsonResponse(
+                    {"error": "JLCPCB API credentials are not configured"},
+                    status=400,
+                )
+            records = service.api_client.component_details(codes)
+            safe = {
+                code: safe_component_detail(records[code])
+                for code in codes
+                if code in records
+            }
+            return JsonResponse(
+                {
+                    "requested": len(codes),
+                    "found": len(safe),
+                    "missing": [code for code in codes if code not in safe],
+                    "records": safe,
+                }
+            )
+        except JlcApiError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+        except Exception:
+            logger.exception("JLCPCB component detail lookup failed")
+            return JsonResponse(
+                {"error": "Component detail lookup failed unexpectedly"},
+                status=500,
+            )
+
     def sync_jlc_stock(self, *args, **kwargs):
         """Scheduled entry point for the JLCPCB external-stock reconciliation."""
         try:
@@ -582,6 +648,7 @@ class DipTraceBomPlugin(
             path("catalogue/preview/", self.catalogue_preview, name="catalogue-preview"),
             path("catalogue/apply/", self.catalogue_apply, name="catalogue-apply"),
             path("test-connection/", self.test_connection, name="test-connection"),
+            path("api/component-details/", self.component_details_api, name="component-details-api"),
             path("sync-stock/", self.sync_stock, name="sync-stock"),
             path("preview/", self.preview, name="preview"),
             path("finalize/", self.finalize, name="finalize"),

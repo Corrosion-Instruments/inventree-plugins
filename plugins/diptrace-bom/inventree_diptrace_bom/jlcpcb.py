@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from urllib.parse import urlparse
 
 
 class JlcApiError(RuntimeError):
@@ -166,6 +167,58 @@ class JlcClient:
             message = data.get("message") or data.get("msg") or f"API code {code}"
             raise JlcApiError(f"JLCPCB API error: {message}")
         return data
+
+
+SAFE_COMPONENT_FIELDS = (
+    "componentCode",
+    "componentModel",
+    "componentSpecification",
+    "componentBrandEn",
+    "description",
+    "firstTypeName",
+    "secondTypeName",
+    "stockCount",
+    "componentLibraryType",
+    "componentType",
+    "packageType",
+    "packageName",
+    "dataManualUrl",
+    "datasheetUrl",
+)
+
+
+def safe_component_detail(record: dict | None) -> dict:
+    """Return catalogue facts that are safe to expose to an authenticated client.
+
+    The response deliberately uses an allow-list and extracts only HTTP(S)
+    image URLs. Unknown API fields remain visible by name for diagnostics, but
+    their values are never returned.
+    """
+    record = record if isinstance(record, dict) else {}
+    result = {
+        key: record[key]
+        for key in SAFE_COMPONENT_FIELDS
+        if record.get(key) not in (None, "", [], {})
+    }
+    images: list[str] = []
+
+    def collect(value: Any, key: str = "") -> None:
+        if isinstance(value, dict):
+            for child_key, child_value in value.items():
+                collect(child_value, str(child_key))
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child, key)
+        elif "image" in key.casefold() and isinstance(value, str):
+            parsed = urlparse(value)
+            if parsed.scheme in {"http", "https"} and parsed.hostname:
+                images.append(value)
+
+    collect(record)
+    if images:
+        result["imageUrls"] = list(dict.fromkeys(images))[:10]
+    result["availableFields"] = sorted(str(key) for key in record)
+    return result
 
 
 def availability_summary(public: dict | None, private: dict | None) -> dict:
