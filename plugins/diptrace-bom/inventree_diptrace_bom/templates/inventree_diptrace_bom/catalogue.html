@@ -40,11 +40,11 @@
     .skip-link { position:fixed; top:8px; left:8px; z-index:100; transform:translateY(-150%); border-radius:6px; padding:10px 14px; background:var(--ink); color:#fff; }
     .skip-link:focus { transform:translateY(0); }
     .site-header { border-bottom:1px solid var(--line-soft); background:var(--surface); }
-    .nav-shell,.page-shell { width:min(1520px,calc(100% - 40px)); margin:0 auto; }
+    .nav-shell,.page-shell { width:calc(100% - 40px); max-width:none; margin:0 auto; }
     .nav-shell { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
     .brand { display:inline-flex; align-items:center; gap:10px; color:#101828; font-size:16px; font-weight:700; }
     .brand:hover { color:var(--action); text-decoration:none; }
-    .brand-mark { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; background:var(--action); color:#fff; font-size:13px; letter-spacing:-.04em; }
+    .brand-mark { width:28px; height:28px; display:block; object-fit:contain; }
     .nav-links { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
     .nav-links a { border-radius:6px; padding:8px 10px; color:#475467; font-size:14px; font-weight:500; }
     .nav-links a:hover { background:var(--band); color:var(--ink); text-decoration:none; }
@@ -170,7 +170,7 @@
     .row-action small { display: block; margin-top: 6px; overflow-wrap: anywhere; }
     .row-action button { white-space: nowrap; }
     @media(max-width:900px) {
-      .nav-shell,.page-shell { width:min(100% - 24px,1520px); }
+      .nav-shell,.page-shell { width:calc(100% - 24px); }
       .page-heading { display:block; }
       .workflow-note { margin-top:14px; }
       .nav-shell { align-items:flex-start; padding:14px 0; }

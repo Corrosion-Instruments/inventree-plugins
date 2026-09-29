@@ -522,9 +522,15 @@ class CatalogueTests(unittest.TestCase):
         self.assertIn('/plugin/diptrace-bom/catalogue/"', header)
         self.assertIn('/plugin/diptrace-bom/planner/"', header)
         self.assertEqual(header.count('aria-current="page"'), 3)
+        self.assertIn('src="/static/img/favicon/favicon-32x32.png"', header)
+        self.assertNotIn('aria-hidden="true">IT</span>', header)
         include = '{% include "inventree_diptrace_bom/_header.html" %}'
         self.assertIn(include, importer)
         self.assertIn(include, catalogue)
+        planner = (templates / "planner.html").read_text(encoding="utf-8")
+        for page in (importer, catalogue, planner):
+            self.assertIn("width:calc(100% - 40px)", page)
+            self.assertIn("max-width:none", page)
         for token in ("--ink:#182230", "--canvas:#f6f7f9", "--action:#171717"):
             self.assertIn(token, importer)
             self.assertIn(token, catalogue)
